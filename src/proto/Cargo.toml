@@ -1,0 +1,29 @@
+[package]
+name = "briolette-proto"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tonic = "0.8"
+prost = "0.11"
+rusqlite = { version = "0.28.0", features = ["chrono", "blob", "bundled"] }
+bytes = { version = "1.4.0", features = ["std", "serde"] }
+serde_derive = "1.0.152"
+serde = { version = "1.0.152", features = ["serde_derive", "derive"] }
+log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_info"]}
+# Must match p256 version since RecoveryId isn't properly accessible.
+ecdsa = { version = "0.15.1", features = [ "serde", "signing", "verifying", "der", "pem", "pkcs8" ] }
+p256 = { version = "0.12.0", features = ["serde", "ecdsa", "pem", "ecdsa-core"] }
+briolette-crypto = { path = "../crypto", version = "*" }
+chrono = { version = "0.4.23", features = ["serde"] }
+digest = "0.10.6"
+sha2 = "0.10.6"
+rand = "0.8.5"
+# Kept to configure p256 usage.
+elliptic-curve = { version = "0.13.1", features = ["pkcs8", "std", "pem"] }
+
+
+
+
+[build-dependencies]
+tonic-build = "0.8"

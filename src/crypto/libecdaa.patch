@@ -1,0 +1,630 @@
+diff -prauN -x .git ecdaa/libecdaa/credential_ZZZ.c ../dcube/cbdc/experimental/v0/third_party/ecdaa/libecdaa/credential_ZZZ.c
+--- ecdaa/libecdaa/credential_ZZZ.c	2023-03-10 03:02:52.119045324 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/libecdaa/credential_ZZZ.c	2023-03-02 18:42:54.725574296 +0000
+@@ -119,14 +119,16 @@ int ecdaa_credential_ZZZ_validate(struct
+     // NOTE: We assume the credential was obtained from a call to `deserialize`,
+     //  which already checked the validity of the points A,B,C,D
+ 
+-    // 2) Verify schnorr-like signature
+-    int schnorr_ret = credential_schnorr_verify_ZZZ(credential_signature->c,
+-                                                    credential_signature->s,
+-                                                    &credential->B,
+-                                                    &member_pk->Q,
+-                                                    &credential->D);
+-    if (0 != schnorr_ret)
+-        ret = -1;
++    // 2) Verify schnorr-like signature, if supplied.
++    if (credential_signature != NULL) {
++        int schnorr_ret = credential_schnorr_verify_ZZZ(credential_signature->c,
++                                                        credential_signature->s,
++                                                        &credential->B,
++                                                        &member_pk->Q,
++                                                        &credential->D);
++        if (0 != schnorr_ret)
++            ret = -1;
++    }
+ 
+     ECP2_ZZZ basepoint2;
+     ecp2_ZZZ_set_to_generator(&basepoint2);
+diff -prauN -x .git ecdaa/libecdaa/include/ecdaa/signature_ZZZ.h ../dcube/cbdc/experimental/v0/third_party/ecdaa/libecdaa/include/ecdaa/signature_ZZZ.h
+--- ecdaa/libecdaa/include/ecdaa/signature_ZZZ.h	2023-03-10 03:02:52.119045324 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/libecdaa/include/ecdaa/signature_ZZZ.h	2023-02-09 23:51:57.321158712 +0000
+@@ -75,6 +75,52 @@ int ecdaa_signature_ZZZ_sign(struct ecda
+                              struct ecdaa_credential_ZZZ *cred,
+                              ecdaa_rand_func get_random);
+ 
++
++/*
++ * Create an ECDAA signature where the credential is pre-randomized.
++ * Do NOT call this with the unrandomized credential.
++ *
++ * To create an unlinkable signature,
++ * `basename` must be `NULL` *and* `basename_len` must be `0`.
++ *
++ * Returns:
++ * 0 on success
++ * -1 if unable to create signature
++ */
++int ecdaa_signature_ZZZ_sign_only(struct ecdaa_signature_ZZZ *signature_out,
++                             const uint8_t* message,
++                             uint32_t message_len,
++                             const uint8_t* basename,
++                             uint32_t basename_len,
++                             struct ecdaa_member_secret_key_ZZZ *sk,
++                             struct ecdaa_credential_ZZZ *randomized_cred,
++                             ecdaa_rand_func get_random);
++
++
++/*
++ * Create an ECDAA randomized credential for use with sign_only calls.
++ *
++ * Returns:
++ * 0 on success
++ * -1 if unable to randomize credential
++ */
++int ecdaa_credential_ZZZ_randomize(struct ecdaa_credential_ZZZ *cred,
++                                   ecdaa_rand_func get_random,
++                                   struct ecdaa_credential_ZZZ *cred_out);
++ 
++/*
++ * Confirms that the randomized credential matches the credential in the signature.
++ *
++ * This will not unrandomize the signing credential nor does it verify().
++ *
++ * Returns:
++ * 0 on success
++ * -1 if credential does not match.
++ */
++int ecdaa_signature_ZZZ_credential(struct ecdaa_signature_ZZZ *signature,
++                                   struct ecdaa_credential_ZZZ *expected_cred);
++
++
+ /*
+  * Verify an ECDAA signature.
+  *
+diff -prauN -x .git ecdaa/libecdaa/signature_ZZZ.c ../dcube/cbdc/experimental/v0/third_party/ecdaa/libecdaa/signature_ZZZ.c
+--- ecdaa/libecdaa/signature_ZZZ.c	2023-03-10 03:02:52.123045320 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/libecdaa/signature_ZZZ.c	2023-02-09 23:51:57.337158685 +0000
+@@ -49,6 +49,47 @@ size_t ecdaa_signature_ZZZ_with_nym_leng
+     return ECDAA_SIGNATURE_ZZZ_WITH_NYM_LENGTH;
+ }
+ 
++int ecdaa_signature_ZZZ_sign_only(struct ecdaa_signature_ZZZ *signature_out,
++                                  const uint8_t* message,
++                                  uint32_t message_len,
++                                  const uint8_t* basename,
++                                  uint32_t basename_len,
++                                  struct ecdaa_member_secret_key_ZZZ *sk,
++                                  struct ecdaa_credential_ZZZ *randomized_cred,
++                                  ecdaa_rand_func get_random)
++{
++    // 1) Copy the randomized credential into the signature
++    // R = l*A
++    ECP_ZZZ_copy(&signature_out->R, &randomized_cred->A);
++
++    // S = l*B
++    ECP_ZZZ_copy(&signature_out->S, &randomized_cred->B);
++
++    // T = l*C
++    ECP_ZZZ_copy(&signature_out->T, &randomized_cred->C);
++
++    // W = l*D
++    ECP_ZZZ_copy(&signature_out->W, &randomized_cred->D);
++
++
++    // 2) Create a Schnorr-like signature on W concatenated with the message,
++    //  where the basepoint is S.
++    int sign_ret = schnorr_sign_ZZZ(&signature_out->c,
++                                    &signature_out->s,
++                                    &signature_out->n,
++                                    &signature_out->K,
++                                    message,
++                                    message_len,
++                                    &signature_out->S,
++                                    &signature_out->W,
++                                    sk->sk,
++                                    basename,
++                                    basename_len,
++                                    get_random);
++
++    return sign_ret;
++}
++
+ int ecdaa_signature_ZZZ_sign(struct ecdaa_signature_ZZZ *signature_out,
+                              const uint8_t* message,
+                              uint32_t message_len,
+@@ -79,6 +120,18 @@ int ecdaa_signature_ZZZ_sign(struct ecda
+     return sign_ret;
+ }
+ 
++int ecdaa_signature_ZZZ_credential(struct ecdaa_signature_ZZZ *signature,
++                                   struct ecdaa_credential_ZZZ *expected_cred)
++{
++    if (1 != ECP_ZZZ_equals(&signature->R, &expected_cred->A) ||
++        1 != ECP_ZZZ_equals(&signature->S, &expected_cred->B) ||
++	1 != ECP_ZZZ_equals(&signature->T, &expected_cred->C) ||
++        1 != ECP_ZZZ_equals(&signature->W, &expected_cred->D)) {
++        return -1;
++    }
++    return 0;
++}
++
+ int ecdaa_signature_ZZZ_verify(struct ecdaa_signature_ZZZ *signature,
+                                struct ecdaa_group_public_key_ZZZ *gpk,
+                                struct ecdaa_revocations_ZZZ *revocations,
+@@ -329,6 +382,42 @@ void ecdaa_signature_ZZZ_access_pseudony
+     *pseudonym_length_out = ECP_ZZZ_LENGTH;
+ }
+ 
++int ecdaa_credential_ZZZ_randomize(struct ecdaa_credential_ZZZ *cred,
++                                   ecdaa_rand_func get_random,
++                                   struct ecdaa_credential_ZZZ *cred_out)
++{
++    if (cred == NULL || cred_out == NULL || get_random == NULL) {
++	    return -1;
++    }
++    // 1) Choose random l <- Z_p
++    BIG_XXX l;
++    ecp_ZZZ_random_mod_order(&l, get_random);
++
++    // 2) Multiply the four points in the credential by l,
++    //  and save to the four points in the signature
++
++    // 2i) Precompute sig->R from multipl cred->A by l (R = l*A)
++    ECP_ZZZ_copy(&cred_out->A, &cred->A);
++    ECP_ZZZ_mul(&cred_out->A, l);
++
++    // 2ii) Precompute sig->S from multiply cred->B by l (S = l*B)
++    ECP_ZZZ_copy(&cred_out->B, &cred->B);
++    ECP_ZZZ_mul(&cred_out->B, l);
++
++    // 2iii) Precomputes sig->T from multiply cred->C by l (T = l*C)
++    ECP_ZZZ_copy(&cred_out->C, &cred->C);
++    ECP_ZZZ_mul(&cred_out->C, l);
++
++    // 2iv) Precomputes sig->W from multiply cred->D by l (W = l*D)
++    ECP_ZZZ_copy(&cred_out->D, &cred->D);
++    ECP_ZZZ_mul(&cred_out->D, l);
++
++    // Clear sensitive intermediate memory.
++    BIG_XXX_zero(l);
++
++    return 0;
++}
++
+ void randomize_credential_ZZZ(struct ecdaa_credential_ZZZ *cred,
+                               ecdaa_rand_func get_random,
+                               struct ecdaa_signature_ZZZ *signature_out)
+diff -prauN -x .git ecdaa/tool/CMakeLists.txt ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/CMakeLists.txt
+--- ecdaa/tool/CMakeLists.txt	2023-03-10 03:02:52.123045320 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/CMakeLists.txt	2023-02-09 23:51:57.389158599 +0000
+@@ -27,6 +27,8 @@ set(ECDAA_TOOL_SRC_INPUT_FILES
+   ${CMAKE_CURRENT_SOURCE_DIR}/issuer_issue_credential_ZZZ.c
+   ${CMAKE_CURRENT_SOURCE_DIR}/member_process_credential_ZZZ.h
+   ${CMAKE_CURRENT_SOURCE_DIR}/member_process_credential_ZZZ.c
++  ${CMAKE_CURRENT_SOURCE_DIR}/member_randomize_credential_ZZZ.h
++  ${CMAKE_CURRENT_SOURCE_DIR}/member_randomize_credential_ZZZ.c
+   ${CMAKE_CURRENT_SOURCE_DIR}/member_gen_keys_ZZZ.h
+   ${CMAKE_CURRENT_SOURCE_DIR}/member_gen_keys_ZZZ.c
+   ${CMAKE_CURRENT_SOURCE_DIR}/member_sign_ZZZ.h
+diff -prauN -x .git ecdaa/tool/ecdaa.c ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/ecdaa.c
+--- ecdaa/tool/ecdaa.c	2023-03-10 03:02:52.123045320 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/ecdaa.c	2023-02-09 23:51:57.389158599 +0000
+@@ -23,6 +23,7 @@
+ #include "member_gen_keys_ZZZ.h"
+ #include "issuer_issue_credential_ZZZ.h"
+ #include "member_process_credential_ZZZ.h"
++#include "member_randomize_credential_ZZZ.h"
+ #include "member_sign_ZZZ.h"
+ #include "verify_ZZZ.h"
+ #include "parse_cli.h"
+@@ -80,15 +81,24 @@ int main(int argc, char **argv) {
+             break;
+         case action_sign:
+             switch (params.curve) {
+-                EXPAND_CURVE_CASE(member_sign, ZZZ, params.sk, params.cred, params.sig, params.message, params.basename)
++                EXPAND_CURVE_CASE(member_sign, ZZZ, params.sk, params.cred, params.sig, params.message, params.basename, params.sign_only)
+                 default:
+                     out = UNKNOWN_CURVE_ERROR;
+                     break;
+             }
+             break;
++        case action_randomize_credential:
++            switch (params.curve) {
++                EXPAND_CURVE_CASE(member_randomize_credential, ZZZ, params.cred, params.cred_out)
++                default:
++                    out = UNKNOWN_CURVE_ERROR;
++                    break;
++            }
++            break;
++
+         case action_verify:
+             switch (params.curve) {
+-                EXPAND_CURVE_CASE(verify, ZZZ, params.message, params.sig, params.gpk, params.sk_rev_list, params.num_sk_revs, params.bsn_rev_list, params.num_bsn_revs, params.basename)
++                EXPAND_CURVE_CASE(verify, ZZZ, params.message, params.sig, params.gpk, params.sk_rev_list, params.num_sk_revs, params.bsn_rev_list, params.num_bsn_revs, params.basename, params.cred)
+                 default:
+                     out = UNKNOWN_CURVE_ERROR;
+                     break;
+diff -prauN -x .git ecdaa/tool/member_randomize_credential_ZZZ.c ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/member_randomize_credential_ZZZ.c
+--- ecdaa/tool/member_randomize_credential_ZZZ.c	1970-01-01 00:00:00.000000000 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/member_randomize_credential_ZZZ.c	2023-02-09 23:51:57.421158546 +0000
+@@ -0,0 +1,49 @@
++/******************************************************************************
++ *
++ * Copyright 2018 Xaptum, Inc.
++ *
++ *    Licensed under the Apache License, Version 2.0 (the "License");
++ *    you may not use this file except in compliance with the License.
++ *    You may obtain a copy of the License at
++ *
++ *        http://www.apache.org/licenses/LICENSE-2.0
++ *
++ *    Unless required by applicable law or agreed to in writing, software
++ *    distributed under the License is distributed on an "AS IS" BASIS,
++ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ *    See the License for the specific language governing permissions and
++ *    limitations under the License
++ *
++ *****************************************************************************/
++
++#include "member_randomize_credential_ZZZ.h"
++
++#include <ecdaa.h>
++
++#include "tool_rand.h"
++
++int member_randomize_credential_ZZZ(const char* credential_file, const char* credential_out_file)
++{
++    int ret = SUCCESS;
++    // Read member credential from disk
++    struct ecdaa_credential_ZZZ cred;
++    ret = ecdaa_credential_ZZZ_deserialize_file(&cred, credential_file);
++    if (0 != ret) {
++        return ret;
++    }
++
++    // Randomize the credential
++    struct ecdaa_credential_ZZZ cred_out;
++    ret = ecdaa_credential_ZZZ_randomize(&cred, tool_rand, &cred_out);
++    if (0 != ret) {
++	    return ret;
++    }
++
++    // Write credential to file
++    ret = ecdaa_credential_ZZZ_serialize_file(credential_out_file, &cred_out);
++    if (0 != ret) {
++        return ret;
++    }
++
++    return SUCCESS;
++}
+diff -prauN -x .git ecdaa/tool/member_randomize_credential_ZZZ.h ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/member_randomize_credential_ZZZ.h
+--- ecdaa/tool/member_randomize_credential_ZZZ.h	1970-01-01 00:00:00.000000000 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/member_randomize_credential_ZZZ.h	2023-02-09 23:51:57.433158526 +0000
+@@ -0,0 +1,40 @@
++/******************************************************************************
++*
++* Copyright 2018 Xaptum, Inc.
++*
++*    Licensed under the Apache License, Version 2.0 (the "License");
++*    you may not use this file except in compliance with the License.
++*    You may obtain a copy of the License at
++*
++*        http://www.apache.org/licenses/LICENSE-2.0
++*
++*    Unless required by applicable law or agreed to in writing, software
++*    distributed under the License is distributed on an "AS IS" BASIS,
++*    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++*    See the License for the specific language governing permissions and
++*    limitations under the License
++*
++*****************************************************************************/
++#ifndef ECDAA_TOOL_RANDOMIZE_CREDENTIAL_ZZZ_H
++#define ECDAA_TOOL_RANDOMIZE_CREDENTIAL_ZZZ_H
++#pragma once
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/*
++* Randomizes the supplied credential and serializes to disk.
++*
++* Returns:
++* SUCCESS                     on success
++* READ_FROM_FILE_ERROR        an error occurred reading from file
++* DESERIALIZE_KEY_ERROR       an error occurred deserializing keys
++*/
++int member_randomize_credential_ZZZ(const char* credential_file, const char* credential_out_file);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff -prauN -x .git ecdaa/tool/member_sign_ZZZ.c ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/member_sign_ZZZ.c
+--- ecdaa/tool/member_sign_ZZZ.c	2023-03-10 03:02:52.123045320 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/member_sign_ZZZ.c	2023-02-09 23:51:57.465158474 +0000
+@@ -25,7 +25,7 @@
+ #define MAX_MESSAGE_SIZE 1024
+ 
+ int member_sign_ZZZ(const char* secret_key_file, const char* credential_file, const char* sig_out_file,
+-                        const char* message_file, const char* basename_file)
++                        const char* message_file, const char* basename_file, int sign_only)
+ {
+     // Read member secret key from disk
+     struct ecdaa_member_secret_key_ZZZ sk;
+@@ -65,8 +65,15 @@ int member_sign_ZZZ(const char* secret_k
+ 
+     // Create signature
+     struct ecdaa_signature_ZZZ sig;
+-    if (0 != ecdaa_signature_ZZZ_sign(&sig, message, msg_len, basename, basename_len, &sk, &cred, tool_rand)) {
+-        return SIGNING_ERROR;
++    if (sign_only) {
++        // Assume the processed credential is randomized already. 
++        if (0 != ecdaa_signature_ZZZ_sign_only(&sig, message, msg_len, basename, basename_len, &sk, &cred, tool_rand)) {
++            return SIGNING_ERROR;
++        }
++    } else {
++        if (0 != ecdaa_signature_ZZZ_sign(&sig, message, msg_len, basename, basename_len, &sk, &cred, tool_rand)) {
++            return SIGNING_ERROR;
++        }
+     }
+ 
+     // Write signature to file
+diff -prauN -x .git ecdaa/tool/member_sign_ZZZ.h ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/member_sign_ZZZ.h
+--- ecdaa/tool/member_sign_ZZZ.h	2023-03-10 03:02:52.123045320 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/member_sign_ZZZ.h	2023-02-09 23:51:57.465158474 +0000
+@@ -34,7 +34,7 @@ extern "C" {
+ * WRITE_TO_FILE_ERROR         an error occurred writing keys to files
+ */
+ int member_sign_ZZZ(const char* secret_key_file, const char* credential_file, const char* sig_out_file,
+-                     const char* message_file, const char* basename_file);
++                     const char* message_file, const char* basename_file, int sign_only);
+ 
+ #ifdef __cplusplus
+ }
+diff -prauN -x .git ecdaa/tool/parse_cli.c ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/parse_cli.c
+--- ecdaa/tool/parse_cli.c	2023-03-10 03:02:52.123045320 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/parse_cli.c	2023-02-09 23:51:57.469158466 +0000
+@@ -292,6 +292,51 @@ void parse_process_credential_cli(int ar
+ }
+ 
+ static
++void parse_randomize_credential_cli(int argc, char **argv, struct cli_params *params)
++{
++    params->curve = 0;
++    params->cred = "cred.bin";
++    params->cred_out = "cred_out.bin";
++
++    const char *usage_str = "Randomize a credential.\n\n"
++        "Usage: %s %s [-h] [-u] [-c <file>] [-r <file>]\n"
++        "\tOptions:\n"
++        "\t\t-h --help              Display this message.\n"
++        "\t\t-u --curve             Curve to use [default = %s].\n"
++        "\t\t\tZZZ\n"
++        "\t\t-c --cred              DAA Credential location [default = cred.bin].\n"
++        "\t\t-r --credout           Randomized DAA Credential output location [default = cred_out.bin].\n"
++        ;
++
++    static struct option cli_options[] =
++    {
++        {"curve", required_argument, NULL, 'u'},
++        {"cred", required_argument, NULL, 'c'},
++        {"credout", required_argument, NULL, 'r'},
++        {"help", no_argument, NULL, 'h'},
++        {NULL, 0, NULL, 0}
++    };
++    int c;
++    while ((c = getopt_long(argc, argv, "u:c:r:h", cli_options, NULL)) != -1) {
++        switch (c) {
++            case 'u':
++                parse_curve(&params->curve, optarg);
++                break;
++            case 'c':
++                params->cred=optarg;
++                break;
++            case 'r':
++                params->cred_out=optarg;
++                break;
++            case 'h':
++            default:
++                printf(usage_str, argv[0], argv[1], curve_name_strings[0]);
++                exit(1);
++        }
++    }
++}
++
++static
+ void parse_sign_cli(int argc, char **argv, struct cli_params *params)
+ {
+     params->curve = 0;
+@@ -300,6 +345,7 @@ void parse_sign_cli(int argc, char **arg
+     params->message = "message.bin";
+     params->basename = NULL;
+     params->sig = "sig.bin";
++    params->sign_only = 0;
+     const char *usage_str = "Create a DAA signature over the message.\n\n"
+         "Usage: %s %s [-h] [-u] [-s <file>] [-c <file>] [-g <file>] [-m <file>] [-b <file>]\n"
+         "\tOptions:\n"
+@@ -311,8 +357,10 @@ void parse_sign_cli(int argc, char **arg
+         "\t\t-m --message           Message location [default = message.bin].\n"
+         "\t\t-b --basename          Basename location [default = NULL].\n"
+         "\t\t-g --sig               Signature output location [default = sig.bin].\n"
++	"\t\t-o --sign_only         Assumes DAA Credential is pre-randomized.\n"
+         ;
+ 
++    static int sign_only = 0;
+     static struct option cli_options[] =
+     {
+         {"curve", required_argument, NULL, 'u'},
+@@ -321,11 +369,12 @@ void parse_sign_cli(int argc, char **arg
+         {"sig", required_argument, NULL, 'g'},
+         {"message", required_argument, NULL, 'm'},
+         {"basename", required_argument, NULL, 'b'},
++        {"sign_only", no_argument, &sign_only, 1},
+         {"help", no_argument, NULL, 'h'},
+         {NULL, 0, NULL, 0}
+     };
+     int c;
+-    while ((c = getopt_long(argc, argv, "u:s:c:g:m:b:h", cli_options, NULL)) != -1) {
++    while ((c = getopt_long(argc, argv, "u:s:c:g:m:b:ho", cli_options, NULL)) != -1) {
+         switch (c) {
+             case 'u':
+                 parse_curve(&params->curve, optarg);
+@@ -345,12 +394,16 @@ void parse_sign_cli(int argc, char **arg
+             case 'b':
+                 params->basename=optarg;
+                 break;
++	    case 'o':
++		params->sign_only = 1;
++		break;
+             case 'h':
+             default:
+                 printf(usage_str, argv[0], argv[1], curve_name_strings[0]);
+                 exit(1);
+         }
+     }
++    params->sign_only = (sign_only ? sign_only : params->sign_only);
+ }
+ 
+ static
+@@ -365,10 +418,11 @@ void parse_verify_cli(int argc, char **a
+     params->num_sk_revs = "0";
+     params->num_bsn_revs = "0";
+     params->basename = NULL;
++    params->cred = NULL;
+ 
+ 
+     const char *usage_str = "Verify a signature.\n\n"
+-        "Usage: %s %s [-h] [-u] [-m <file>] [-s <file>] [-g <file>] [-k <file>] [-n <file>] [-e <file>] [-v <file>] [-b <file>]\n"
++        "Usage: %s %s [-h] [-u] [-m <file>] [-s <file>] [-g <file>] [-k <file>] [-n <file>] [-e <file>] [-v <file>] [-b <file>] [-c <file>]\n"
+         "\tOptions:\n"
+         "\t\t-h --help              Display this message.\n"
+         "\t\t-u --curve             Curve to use [default = %s].\n"
+@@ -381,6 +435,7 @@ void parse_verify_cli(int argc, char **a
+         "\t\t-b --basename          Basename location [default = NULL].\n"
+         "\t\t-n --bsn_rev_list      Basename revocation list location [default = NULL].\n"
+         "\t\t-v --num_bsn_revs      Number of basename revocations [default = 0].\n"
++        "\t\t-c --cred              Expected randomized credential in the signature [default = NULL].\n"
+         ;
+ 
+     static struct option cli_options[] =
+@@ -394,11 +449,12 @@ void parse_verify_cli(int argc, char **a
+         {"num_sk_revs", required_argument, NULL, 'e'},
+         {"num_bsn_revs", required_argument, NULL, 'v'},
+         {"basename", required_argument, NULL, 'b'},
++        {"cred", required_argument, NULL, 'c'},
+         {"help", no_argument, NULL, 'h'},
+         {NULL, 0, NULL, 0}
+     };
+     int c;
+-    while ((c = getopt_long(argc, argv, "u:m:s:g:k:n:e:v:b:h", cli_options, NULL)) != -1) {
++    while ((c = getopt_long(argc, argv, "u:m:s:g:k:n:e:v:b:c:h", cli_options, NULL)) != -1) {
+         switch (c) {
+             case 'u':
+                 parse_curve(&params->curve, optarg);
+@@ -427,6 +483,9 @@ void parse_verify_cli(int argc, char **a
+             case 'b':
+                 params->basename=optarg;
+                 break;
++            case 'c':
++		params->cred=optarg;
++		break;
+             case 'h':
+             default:
+                 printf(usage_str, argv[0], argv[1], curve_name_strings[0]);
+@@ -442,6 +501,7 @@ void parse_member_cli(int argc, char** a
+         "Options:\n"
+         "\tgenkeys                       Generate a member keypair.\n"
+         "\tprocesscredential             Validate a credential.\n"
++        "\trandomizecredential           Randomize a credential.\n"
+         "\tsign                          Create a DAA signature.\n"
+         ;
+ 
+@@ -458,6 +518,10 @@ void parse_member_cli(int argc, char** a
+     {
+         params->command=action_process_credential;
+         parse_process_credential_cli(argc, argv, params);
++    } else if (strcmp(argv[2], "randomizecredential")==0)
++    {
++        params->command=action_randomize_credential;
++        parse_randomize_credential_cli(argc, argv, params);
+     } else if (strcmp(argv[2], "sign")==0)
+     {
+         params->command=action_sign;
+diff -prauN -x .git ecdaa/tool/parse_cli.h ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/parse_cli.h
+--- ecdaa/tool/parse_cli.h	2023-03-10 03:02:52.123045320 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/parse_cli.h	2023-02-09 23:51:57.469158466 +0000
+@@ -30,6 +30,7 @@ typedef enum {
+     action_member_gen_keys,
+     action_issue_credential,
+     action_process_credential,
++    action_randomize_credential,
+     action_sign,
+     action_verify,
+     action_help
+@@ -52,6 +53,7 @@ struct cli_params{
+     const char* sk;
+     const char* cred;
+     const char* cred_sig;
++    const char* cred_out;
+     const char* sig;
+     const char* message;
+     const char* basename;
+@@ -60,7 +62,7 @@ struct cli_params{
+     const char *bsn_rev_list;
+     const char* num_bsn_revs;
+     const char *basename_file;
+-
++    int sign_only;
+ };
+ 
+ void parse_cli(int argc, char **argv, struct cli_params *params);
+diff -prauN -x .git ecdaa/tool/verify_ZZZ.c ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/verify_ZZZ.c
+--- ecdaa/tool/verify_ZZZ.c	2023-03-10 03:02:52.123045320 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/verify_ZZZ.c	2023-02-09 23:51:57.477158454 +0000
+@@ -29,7 +29,8 @@ static
+ int parse_bsn_rev_list_file(struct ecdaa_revocations_ZZZ *revocations_out, const char *filename, unsigned num_revs);
+ 
+ int verify_ZZZ(const char *message_file, const char *sig_file, const char *gpk_file, const char *sk_rev_list_file,
+-                const char *sk_revs, const char *bsn_rev_list_file, const char *bsn_revs, const char *basename_file)
++                const char *sk_revs, const char *bsn_rev_list_file, const char *bsn_revs, const char *basename_file,
++		const char *cred_file)
+ {
+     int ret = SUCCESS;
+ 
+@@ -75,6 +76,21 @@ int verify_ZZZ(const char *message_file,
+         goto cleanup;
+     }
+ 
++    // Read the cred file (if requested)
++    struct ecdaa_credential_ZZZ cred;
++    if (NULL != cred_file) {
++      ret = ecdaa_credential_ZZZ_deserialize_file(&cred, cred_file);
++        if (SUCCESS != ret) {
++            ret = DESERIALIZE_KEY_ERROR;
++            goto cleanup;
++        }
++        // Confirm the cred matches the signature prior to validation.
++        if (0 != ecdaa_signature_ZZZ_credential(&sig, &cred)) {
++            ret = VERIFY_ERROR;
++            goto cleanup;
++        }
++    }
++
+     // Read group public key from disk
+     struct ecdaa_group_public_key_ZZZ gpk;
+     if (ECDAA_GROUP_PUBLIC_KEY_ZZZ_LENGTH != ecdaa_read_from_file(buffer, ECDAA_GROUP_PUBLIC_KEY_ZZZ_LENGTH, gpk_file)) {
+diff -prauN -x .git ecdaa/tool/verify_ZZZ.h ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/verify_ZZZ.h
+--- ecdaa/tool/verify_ZZZ.h	2023-03-10 03:02:52.123045320 +0000
++++ ../dcube/cbdc/experimental/v0/third_party/ecdaa/tool/verify_ZZZ.h	2023-02-09 23:51:57.509158401 +0000
+@@ -35,7 +35,7 @@ extern "C" {
+ * WRITE_TO_FILE_ERROR         an error occurred while writing to a file
+ */
+ int verify_ZZZ(const char *message_file, const char *sig_file, const char *gpk_file, const char *sk_rev_list_file,
+-             const char *number_of_sk_revs, const char *bsn_rev_list_file, const char *number_of_bsn_revs, const char *basename_file);
++             const char *number_of_sk_revs, const char *bsn_rev_list_file, const char *number_of_bsn_revs, const char *basename_file, const char *cred_file);
+ 
+ #ifdef __cplusplus
+ }

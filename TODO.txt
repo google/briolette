@@ -1,0 +1,23 @@
+* move TODOs to the issue tracker
+* add split tag checking to TokenVerify to ensure the amount lt total
+* add nac enforcement and revocation checks across all 'services'
+* move all crypto (verify/sign) to proto/ and out of services
+* add a trim server
+* rationalize Wallet, WalletData, and Receiver names
+* bsn extraction for revocation and use for Clerk rate limiting as the proof-of-concept
+* revocation enforcement in clerk and registrar
+* Multiple registrars and NACs
+* More complete ticket and group mappings in tokenmap
+* Split Transfer and Proof of Posession with 0 value splits.
+* epoch generate commandline
+* create a revocation manager that handles the epochs and managing the revocation data life cycle
+* cross-server URIs as commandline flags
+* add epoch pk recovery from signature
+* recovery server and proof-of-binding
+* implement max transfer limits
+* implement ticket max-transaction size tag
+* extensive unittesting and integration tests
+* revisit simulator and flesh out to share system logic
+* look at a pure rust ecdaa implementation
+* cloud deployment example
+* v1 protocol reference implementation

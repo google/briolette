@@ -1,0 +1,62 @@
+// Copyright 2023 The Briolette Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+package briolette;
+
+enum Version {
+  CURRENT = 0;
+}
+
+enum ErrorCode {
+  INVALID_VERSION = 0;
+  INVALID_MISSING_FIELDS = 1;
+  INVALID_AMOUNT_TYPE = 2;
+  UNKNOWN_TICKET_PUBLIC_KEY = 3;
+  UNPARSEABLE_TICKET_SIGNATURE = 4;
+  INVALID_TICKET_SIGNATURE = 5;
+  INVALID_TICKET_GROUP = 6;
+  UNRECOVERABLE_PUBLIC_KEY = 7;
+  FAILED_TO_SIGN_TOKEN_TRANSFER = 8;
+  INVALID_TICKET_CREATED_ON = 9;
+  TICKET_EXPIRED = 10;
+  INVALID_SIGNING_KEY = 11;
+  INVALID_SIGNATURE = 12;
+  UNKNOWN_TOKEN_TRANSFER_GROUP_PUBLIC_KEY = 13;
+  CREDENTIAL_INVALID_FOR_GROUP = 14;
+  EPOCH_UPDATE_REQUIRED = 15;
+  FAILED_TO_SIGN_TICKET = 16;
+  INVALID_HWID_SIGNATURE = 17;
+  INVALID_NETWORK_CREDENTIAL_REQUEST = 18;
+  INVALID_TOKEN_CREDENTIAL_REQUEST = 19;
+  REVOCATION_NOT_FOUND = 20;
+  INVALID_HISTORY_SIGNATURE = 21;
+  INVALID_BASE_SIGNATURE = 22;
+  UNKNOWN_MINT_PUBLIC_KEY = 23;
+  UNPARSEABLE_BASE_SIGNATURE = 24;
+  INVALID_EPOCH_SIGNATURE = 25;
+  UNPARSEABLE_PUBLIC_KEY = 26;
+  TOKEN_IS_BAD = 27;
+  UNKNOWN_TRANSACTION_ID = 28;
+  UNKNOWN_TRANSACTION_PEER = 29;
+  INVALID_SERVER_STATE = 100;
+  SERVER_DISK_ERROR = 101;
+  DATABASE_INTERACTION_ERROR = 102;
+  TICKET_SIGNATURE_MISSING = 103;
+  TOKEN_MAP_FAILURE = 104;
+  CLERK_FETCH_FAILURE = 105;
+}
+message Error {
+    ErrorCode code = 1;
+}

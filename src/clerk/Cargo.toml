@@ -1,0 +1,42 @@
+[package]
+name = "briolette-clerk"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]] # Bin to run the Validate gRPC server
+name = "briolette-clerk-server"
+path = "src/server_main.rs"
+
+
+[[bin]] # Bin to run the Validate gRPC client
+name = "briolette-clerk-client"
+path = "src/client.rs"
+
+[[bin]] # Job to run once every Epoch to collect revocation data and create Epochs
+name = "briolette-clerk-generate-epoch"
+path = "src/epoch_generate.rs"
+
+
+[dependencies]
+tonic = { version = "0.8" }
+prost = "0.11"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+briolette-crypto = { path = "../crypto", version = "*" }
+briolette-proto = { path = "../proto", version = "*" }
+log = "0.4.17"
+bytes = { version = "1.4.0", features = ["std", "serde"] }
+ecdsa = { version = "0.15.1", features = ["serde", "signing", "verifying", "der", "pkcs8", "pem"] }
+p256 = { version = "0.12.0", features = ["serde", "ecdsa"]}
+# For local storage serialization.
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rand_core = { version = "0.6.4", features = [ "getrandom", "serde"] }
+elliptic-curve = { version = "0.12.3", features = ["serde", "serde_json", "group", "ff", "arithmetic", "pem", "pkcs8", "voprf", "digest", "hash2curve", "std", "hkdf"] }
+chrono = { version = "0.4.23", features = ["serde"] }
+digest = "0.10.6"
+sha2 = "0.10.6"
+rand = "0.8.5"
+stderrlog = "0.5.4"
+
+[build-dependencies]
+tonic-build = "0.8"

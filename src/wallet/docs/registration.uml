@@ -1,0 +1,25 @@
+@startuml
+title
+ Briolette Wallet Setup
+end title
+
+participant "Wallet" as W
+participant "Wallet Vendor Registrar" as B
+participant "Currency Operator Registrar" as A
+participant "Ticket Server" as D
+Note right of A: By listing the\n participants you can\n change their order
+
+W-->>W: 1. Generate keys: N, T
+W->B: 2. Request network credential for Key: N
+B-->>B: 3. Verify request with \nvendor-specific mechanism &\n issue credential
+B->W: Cred(N)
+W->A: 4. Request token transfer credential for Key: T signed by Cred(N)
+A-->>A: 5. Verify request &\n issue credential
+A->W: Cred(T)
+W-->>W: 6. Generate n randomized Cred(T), t_i
+W->D: 7. Request tickets for all t_i signed by Cred(N) with time-bound linkability
+D-->>D: 8. Verify each t_i,\n assign a random group,\n and issue the tickets
+D->W: For all ti, Ticket_i=msg||TS_Sign(msg) where msg = t_i||group_i||expiration
+Note right of W: 10. Store all tickets and \nuse for token transfers with\n other wallets or itself.
+
+@enduml

@@ -1,0 +1,112 @@
+// Copyright 2023 The Briolette Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+package briolette.registrar;
+
+import "common.proto";
+
+service Registrar {
+    // Registration returns two credentials, one for participation in the
+    // token transfer scheme and the other for interaction with administrative servers.
+    // The token transfer credential is in the same group as all wallets.
+    // The network credential is in a group with similar wallet vendor offerings.
+    // The network credential is used with basename in v0, or other linkability enforcement, to manage ticket issuance.
+    // In v0, ticket requests are randomized transfer credentials signed by the network credential.
+    //        The ticket server than stores the hw-group<>{ticket} mapping alongside randomly chosen group numbers for the
+    //        tickets (groups are prefixed by a supplied prefix to avoid revocation collision)
+    //        A revocation event for a given hwid/group will collect all open tickets for the hw-group and then revoke the
+    //        groups.
+    //        When the hw comes back for more tickets, if it is abusive  hw, it will be denied and 
+    //          offered a URI to ask for help.
+    //        If it is ok in the group, it will receive new tickets with random (non-revoked) ids w/expirations.
+    rpc RegisterCall (RegisterRequest) returns (RegisterReply);
+    // TODO: Add re-issuance call in case of a revocation
+    // It will either check TTC basename for a bad txn, if a TTC migration is happening.
+    // Or it will check the NAC basename for the ticket issuance request to determine if bad requestor.
+    // rpc MigrateCall (MigrateRequest) returns (MigrateReply);
+
+    // TODO: Add new register calls for each protocol implementation!
+    // TODO: Add FetchTrustBundle() to get all public keys/group keys needed to operate.
+}
+
+enum SecurityLevel {
+  LOW = 0;
+  MEDIUM = 1;
+  HIGH = 2;
+}
+
+message HardwareId {
+  uint64 vendor_id = 1;
+  uint64 software_id = 2;
+  uint64 hardware_id = 3;
+  bytes hw_id = 4;
+  SecurityLevel security = 5;
+}
+
+message CredentialRequest {
+   // For v0 ,the public key is the key and a schnorr signature over it and a nonce.
+   // For network credentials, the nonce is over the token public key (to link it to the hw).
+   //
+   // For token credentials, the nonce is a unique hardware key/iod or equivalent.
+   // This is fine for showing access to the token private key and the requesting network
+   // public key, but to gain assurance the keys are both protected by hardware, the network
+   // credential, or verifying crredential,_should_ sign this.  
+   // For ease in the prototype, we make this a single round trip.
+   bytes public_key = 1;
+}
+
+message CredentialReply {
+   // Repeated, one per group requested plus hwid group {}
+   bytes credential = 1;
+   bytes credential_signature = 2;
+   bytes group_public_key = 3;
+}
+
+// TODO: This is not implemented yet.
+enum Algorithm {
+  // There is no verification and the hwid bytes are used as the token cred nonce.
+  NONE = 0;
+  // The "signature" is a X.509 certificate chain proving the "public_key"
+  // was generated in hardware. The "public_key" is the attested to key.
+  // For the token credential, this key is used to sign the token and the signature
+  // is in the nonce.
+  // The certificate chain will validate the HardwareId information.
+  ANDROID_KM_ATTESTATION = 1;
+}
+
+message Signature {
+  Algorithm algorithm = 1;
+  bytes signature = 2;
+  bytes public_key = 3;
+}
+
+// The caller will supply a schnorr scheme public key (ECDAA-FP256BN)
+// with a hwid.  There is no authentication of the client legitimacy.
+// Nonce is always the serialized hwid.
+message RegisterRequest {
+   briolette.Version version = 1;
+   HardwareId hwid = 2;
+   Signature hwid_signature = 3;  // if non-zero, validates hwid content with a trusted key
+   // TODO: One for network admin and one for token transfer credentials.
+   CredentialRequest network_credential = 4;
+   CredentialRequest transfer_credential = 5;
+}
+
+message RegisterReply {
+   // Repeated, one per group requested plus hwid group {}
+   CredentialReply network_credential = 1;
+   CredentialReply transfer_credential = 2;
+   // TODO: Include epoch signing key and URI!  Wallet can hard code initially.
+}

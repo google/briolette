@@ -1,0 +1,25 @@
+[package]
+name = "briolette-receiver"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]] # Bin to run the Validate gRPC server
+name = "briolette-receiver-server"
+path = "src/server_main.rs"
+
+
+[[bin]] # Bin to run the Validate gRPC client
+name = "briolette-receiver-client"
+path = "src/client.rs"
+
+[dependencies]
+tonic = { version = "0.8" }
+prost = "0.11"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+briolette-proto = { path = "../proto", version = "*" }
+briolette-wallet = { path = "../wallet", version = "*" }
+log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_info"]}
+stderrlog = "0.5.4"
+
+[build-dependencies]
+tonic-build = "0.8"

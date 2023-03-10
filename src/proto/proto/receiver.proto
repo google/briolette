@@ -1,0 +1,104 @@
+// Copyright 2023 The Briolette Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+package briolette.receiver;
+import "common.proto";
+import "token.proto";
+import "clerk.proto";
+
+service Receiver {
+    // Cryptographically verifies the tokens and then asks tokenmap if
+    // they are legitimate.
+    rpc Initiate (InitiateRequest) returns (InitiateReply);
+    // Exchange EpochUpdate if either epoch is mismatched above.
+    rpc Gossip (GossipRequest) returns (GossipReply);
+    // Submits proposed payment without performing the transfer.
+    rpc Transact (TransactRequest) returns (TransactReply);
+    // Transfers/finalizes the agreed upon tokens.
+    rpc Transfer (TransferRequest) returns (TransferReply);
+    // TODO: determine if an explicit abort is useful.
+    // rpc Abort (AbortRequest) returns (AbortReply);
+}
+
+message AbortRequest {
+  bytes tx_id = 1;
+}
+message AbortReply {}
+
+message InitiateRequest {
+  .briolette.Version version = 1;
+  .briolette.clerk.EpochData epoch = 2;
+  bytes epoch_signature = 3;
+}
+
+message InitiateReply {
+  // The id is meant to allow the receiver to easily track state.
+  // E.g., digest(salt||peer_addr||time||items) or just a counter.
+  bytes tx_id = 1;
+  .briolette.clerk.EpochData epoch = 2;
+  bytes epoch_signature = 3;
+  // Send the payment destination and requested amount.
+  .briolette.token.SignedTicket ticket = 4;
+  repeated TransactionItem items = 5;
+}
+
+message TransactionItem {
+   .briolette.token.Amount amount = 1; // Associated amount
+   string name = 2; // human readable name
+   string description = 3; // human readable description, if appropriate
+   // If conditional tokens are supported (or private tokens), this allows
+   // acceptance for specific items.
+   repeated bytes supported_mint_public_keys = 4;
+}
+
+message GossipRequest {
+  bytes tx_id = 1;
+  .briolette.clerk.EpochUpdate epoch_update = 2;
+}
+
+message GossipReply {
+  .briolette.clerk.EpochUpdate epoch_update = 1;
+}
+
+message TransactRequest {
+  bytes tx_id = 1;
+  // Propose as many methods as needed to settle
+  // the request. E.g., if there are two token classes
+  // based on mint PK, then there may be two methods.
+  repeated TransactionItemMethod methods = 2;
+}
+message TransactionItemMethod {
+   repeated .briolette.token.Token tokens = 1;
+   bytes mint_public_key = 2;  // default if empty.
+}
+message TransactReply {
+   // A simplistic accept or abort.
+   // Change and other negotiations are possible.
+   bool accept = 1;
+}
+
+message TransferRequest {
+   bytes tx_id = 1;
+   // For each TransactionItem, supply proposed tokens
+   // Transmit the signed tokens.
+   // In practice, only the last token.History needs to
+   // be transferred since the tokens were sent in a prior call.
+   repeated .briolette.token.Token tokens = 2;
+}
+message TransferReply {
+    // Acceptance allows the sender's copies of the tokens to be deleted.
+    // Otherwise, they can be resent.
+    bool accepted = 1;
+}

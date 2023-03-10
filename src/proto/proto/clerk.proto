@@ -1,0 +1,161 @@
+// Copyright 2023 The Briolette Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+package briolette.clerk;
+import "common.proto";
+import "token.proto";
+
+service Clerk {
+    // TODO: allow non-ticket calls to get the current epoch and state updates.
+    // TODO: Move Epoch to an epoch server.
+    rpc GetEpoch (EpochRequest) returns (EpochReply);
+    // TODO: Add RefreshTicket(RefreshTicketRequest) returns (RefreshTicketReply);
+    // For a given ticket, request a fresh ticket over the same credential.  In general,
+    // credentials should be used for a single transaction.  However, in the case of delegation
+    // of payment to a webserver or point-of-sale unit, a stable credential is desirable. Additionally,
+    // for p2p it can be desirable to exchange a payment "address" once with a peer and not need to
+    // replace it after every transaction.  Refreshing a ticket enables this, but also allows any
+    // observers of the coins to discover if they have passed through a "public" credential, so there is
+    // a privacy tradeoff.  Some p2p wallet implementors may choose share unique tickets per peer which
+    // they only refresh if a payment is received (which means sending funds to expired tickets IS valid).
+    // For merchants, these tickets may have an additional Tag which includes their tax-id or other
+    // authenticity data.
+    // Note, this means that tickets are not completely encoded in the Coin provenance, but instead only
+    // the credential is.  The ticket must accompany the coin as necessary verifiable policy data, but
+    // its verification is simpler (ECDSA verify) and this enables refresh.  v1 and other schemes may
+    // simplify this process as well as enable signature aggregation or other efficiency schemes.
+    //
+    // This call issues a fresh ticket for the given expired tickets if their signing NAC is not revoked
+    // and the credentials have not been involved in any double spends.
+    // rpc RefreshTicket(RefreshTicketRequest) returns (RefreshTicketReply);
+
+
+    // Returns time-bound tickets for receiving payments.
+    rpc GetTickets (GetTicketsRequest) returns (GetTicketsReply);
+    // API for passing in a new, signed EpochUpdate
+    rpc AddEpoch(EpochUpdate) returns (AddEpochReply);
+}
+
+message EpochRequest {
+  briolette.Version version = 1;
+  uint64 known_epoch = 2;  // Last seen epoch
+}
+
+message EpochReply {
+  EpochUpdate update = 1;
+}
+
+message ExtendedEpochData {
+  // Lists the current set of supported token transfer credential group public keys.
+  // This does not necessarily change upon revocation.  Even if a member private key (v0)
+  // is compromised, it will be unable to collect tickets as it will need to prove it isn't
+  // the abusive device or go through re-issuance to get a new network access credential.
+  // However, there are reasons to move wallets to new group keys, and this enables it.
+  //
+  // Simulation and active data collection will be required to understand how long effective
+  // propagation for a given deployment will take.
+  repeated bytes ttc_group_public_keys = 1;
+  // Enable key rotation on epoch signatures.
+  repeated bytes epoch_signing_keys = 2;
+  // Enable key rotation on ticket signatures.
+  repeated bytes ticket_signing_keys = 3;
+  // Enable management of trusted mints.
+  repeated bytes mint_signing_keys = 4;
+  // Indicate how long the next epoch will be.
+  uint64 epoch_seconds = 5;
+  // TODO: Add trust bundle updates so key revocations, etc are not terrible.
+  // TODO: Add epoch key distribution to the registrar.
+  // Add service URIs for recovery registration or similar.
+}
+
+// TODO: figure out delta updates, if needed.
+message EpochData {
+  // utc time in 24 hours, or 86400 second, increments.
+  // For v0, the length of the epoch determines linkability across ticket requests.
+  uint64 epoch = 1;
+  // Each bit represents a valid group. If the bit is 1, it has been revoked.
+  // Group stay revoked until all references to the group have expired.  At
+  // that point, a group may move back in to circulation.
+  // TODO: Explore unique id revocations.
+  bytes group_bitfield = 2;
+  // For now, SHA256 of serialized ExtendedEpochData.
+  bytes extended_epoch_data_hash = 3;
+}
+
+message EpochUpdate {
+  Version version = 1;
+  EpochData data = 2;
+  ExtendedEpochData extended_data = 3;
+  // Signature over EpochData
+  bytes epoch_signature = 4;
+  // TODO: Factor out and use ECDSA recovery.
+  bytes signing_key = 5;
+}
+
+message AddEpochReply {};
+
+message TicketRequest {
+  bytes credential = 1; // randomized credential for a Clerk-known TTC GPK
+  // The ticket server will track NAC GPK<>group_num+expiration.  This will allow hardware-specific
+  // revocation if a ticket is caught in a double-spend.  Then all still-valid groups with NAC's will
+  // be quarantined and new ticket requests will require the device to connect to its NAC registrar to
+  // issue a credential against a new NAC GPK by performing a basename (v0)  linked signature over
+  // the double spend with the TTC _or_ by performing a NAC basename-linked signature for the ticket
+  // request.
+  // TODO: The ticket server could allow temporary exceptions by having the request signed with the bad
+  //       basename, but that would not work indefinitely because it would make future ticket requests linkable or
+  //       require a new unlinkable token system to prove the exception.
+  uint32 group_number = 2;
+}
+
+message TicketRequests {
+  repeated TicketRequest request = 1;
+}
+
+// TODO: Ensure there is a max message size since repeated fields can... go on.
+message GetTicketsRequest {
+  Version version = 1;
+  uint64 known_epoch = 2;  // Last seen epoch
+  bytes nac_public_key = 3; // NAC public key to simplify lookup and hw mapping for all signed requests.
+  bytes ttc_public_key = 4;  // The Ticket Transfer Group Public Key the ticket credentials are from.
+  TicketRequests requests = 5;
+  // Version 0 just uses a NAC signature with the basename of the current epoch
+  // Over serialized requests.
+  //
+  // TODO: if we sign with the credential to get a ticket, then it still
+  // doesn't guarantee the NAC is on the TTC.  This disparity allows for tunneled
+  // abuse.  However, it seems wise to make the enforcement of TTC<>NAC binding to
+  // be done by the hardware vendors and the registrars.  Then for the rest of the
+  // we should be able to assume that the binding is valid.
+  // If two devices are compromised from two different vendors, then one could tunnel
+  // ticket requests behind the other NAC causing the revocation of one class of
+  // devices, but not both.  However, the tickets will still be basename-bound (in v0)
+  // to the actual device, but a quarantine of the other NAC group won't force it to
+  // identify itself.  It can then proceed as a normal device performing legitimate
+  // transactions until a NAC compromise can be found in another device to shield its
+  // double spending.  This is the main drawback of the NAC/TTC split. With v1, the
+  // double spending will expose the underlying device identity regardless which will
+  // make this attack irrelevant.
+  // So for now, we do not bother requiring a PoP for the credentials and assume NAC/TTC
+  // binding is enforced at registration.
+  // bytes ttc_signature = 3;
+  bytes nac_signature = 6;
+}
+
+message GetTicketsReply {
+  repeated .briolette.token.SignedTicket tickets = 1;
+  // Public key for verifying the tickets.
+  bytes signing_key = 2;
+}
