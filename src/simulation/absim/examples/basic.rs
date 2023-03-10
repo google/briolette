@@ -1,5 +1,17 @@
-// Copyright 2022 Google, LLC
+// Copyright 2023 The Briolette Authors
 //
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Provides a simple case to exercise simulation features.
 use rand::prelude::*;
 use rand::seq::SliceRandom;
@@ -10,37 +22,38 @@ use std::sync::{Arc, RwLock};
 use absim::clients::LocalSimulationClient;
 use absim::extras::SimulationPopulation;
 use absim::{
-    Address, Agent, Enqueue, Event, EventQueue, Manager, ManagerInterface, Population, Simulation, WorldView,
+    Address, Agent, Enqueue, Event, EventQueue, Manager, ManagerInterface, Population, Simulation,
+    WorldView,
 };
 
 #[derive(Debug)]
 pub struct Simulator {
     pub seed: u64,
     pub clones: Arc<RwLock<usize>>, // Interior Mutability
-    pub rng: Arc<RwLock<StdRng>>, // Interior Mutability!
+    pub rng: Arc<RwLock<StdRng>>,   // Interior Mutability!
 }
 impl Simulator {
     pub fn new(seed: u64) -> Self {
-      Self {
-          seed: seed,
-          clones: Arc::new(RwLock::new(0)),
-          rng: Arc::new(RwLock::new(SeedableRng::seed_from_u64(seed))),
-      }
+        Self {
+            seed: seed,
+            clones: Arc::new(RwLock::new(0)),
+            rng: Arc::new(RwLock::new(SeedableRng::seed_from_u64(seed))),
+        }
     }
 }
 // Create a stable way to maintained seeded randomness across view and client splits.
 impl Clone for Simulator {
-  fn clone(&self) -> Self {
-      let mut c = self.clones.write().unwrap();
-      *c += 1;
-      let m: u64 = (*c).try_into().unwrap();
-      // TODO: overflow will happen :)
-      Self {
-          seed: self.seed,
-          clones: Arc::new(RwLock::new(*c)),
-          rng: Arc::new(RwLock::new(SeedableRng::seed_from_u64(self.seed + m))),
-      }
-  }
+    fn clone(&self) -> Self {
+        let mut c = self.clones.write().unwrap();
+        *c += 1;
+        let m: u64 = (*c).try_into().unwrap();
+        // TODO: overflow will happen :)
+        Self {
+            seed: self.seed,
+            clones: Arc::new(RwLock::new(*c)),
+            rng: Arc::new(RwLock::new(SeedableRng::seed_from_u64(self.seed + m))),
+        }
+    }
 }
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
 pub struct EntityData {
@@ -288,8 +301,9 @@ impl Simulation for Simulator {
                     Address::AgentId(agent.id),
                     Address::Population,
                     EventData::Population(PopulationEvent::Del(PopulationDel {
-                    ids: vec![agent.id]
-                })));
+                        ids: vec![agent.id],
+                    })),
+                );
                 count += 1;
                 return count;
             }
@@ -530,7 +544,11 @@ impl Simulation for Simulator {
                         }
                         // TODO use world data to set locations, etc.
                     }
-                    PopulationEvent::Del(del_data) => for id in &del_data.ids { population.remove(id); }
+                    PopulationEvent::Del(del_data) => {
+                        for id in &del_data.ids {
+                            population.remove(id);
+                        }
+                    }
                 },
                 _ => {}
             }
@@ -558,7 +576,9 @@ fn main() {
     for c in 0..10 {
         let client_seed = rng.gen::<u64>();
         println!("client {} seed: {}", c, client_seed);
-        mgr.add_client(Box::new(LocalSimulationClient::new(Simulator::new(client_seed))));
+        mgr.add_client(Box::new(LocalSimulationClient::new(Simulator::new(
+            client_seed,
+        ))));
     }
     // Enqueue some initial events to get it going!
     for _ in 0..1000 {
@@ -587,14 +607,13 @@ fn main() {
             });
         }
     }
-// TODO add_
+    // TODO add_
     mgr.register_observer(10, &observe);
     mgr.run(10000);
 }
 
 fn observe(step: usize, world: &WorldData, pop: &SimulationPopulation<Simulator>) {
-    let alive = pop
-        .agents.len();
+    let alive = pop.agents.len();
     let dead = pop.next_id - pop.agents.len();
     let res_total: usize = world.resources.iter().map(|r| r.food).sum();
 

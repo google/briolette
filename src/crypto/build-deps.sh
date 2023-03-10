@@ -28,7 +28,7 @@ if [ ! -d ecdaa ]; then
   echo "Applying patches . . ."
   pushd ecdaa
   mkdir -p build/deps
-  patch -p1 <../../libecdaa.patch
+  patch -p1 <../../../../third_party/libecdaa.patch
   popd
 fi
 
