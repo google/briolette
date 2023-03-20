@@ -7,7 +7,6 @@ participant "Wallet" as W
 participant "Wallet Vendor Registrar" as B
 participant "Currency Operator Registrar" as A
 participant "Ticket Server" as D
-Note right of A: By listing the\n participants you can\n change their order
 
 W-->>W: 1. Generate keys: N, T
 W->B: 2. Request network credential for Key: N
