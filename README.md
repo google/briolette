@@ -39,6 +39,9 @@ around ECDAA, using [this](https://github.com/xaptum/ecdaa) implementation. 
 Further research on the underlying crypto approach under way to improve on
 ECDAA.
 
+See the [theory of operation](docs/design/theory_of_operation.md) for a more
+detailed design discussion.
+
 ## Building
 
 ### System dependencies
@@ -47,7 +50,7 @@ Your system will need to have the [Rust](https://www.rust-lang.org/) programming
 
 Additionally, see
 [xaptum/ecdaa](https://github.com/xaptum/ecdaa/blob/master/doc/BUILDING.md) for
-any system requirements for building AMCL or ECDAA.
+any system requirements for building AMCL or ECDAA, such as libtss2.
 
 
 ### Building
@@ -84,4 +87,4 @@ All scenario configuration is currently hard-coded.
 
 ## Contributions, etc
 
-Please see (docs)[docs/] for details.
+Please see [docs](docs/) for details.
