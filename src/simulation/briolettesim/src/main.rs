@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//  Initial model describing the Briolette eCash system.
-//
+//  Basic model describing the briolette digital currency system.
 use rand::prelude::*;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -969,7 +968,7 @@ impl Simulation for Simulator {
                     && data.account_balance > 5
                     && view.data().step > data.last_requested_step + 1
                 {
-                    // TODO: We shoudl enqueue a Gossip here but we'll let the bank fire it off.
+                    // TODO: We should enqueue a Gossip here but we'll let the bank fire it off.
                     queue.enqueue(
                         Address::AgentId(agent.id),
                         Address::AgentId(data.bank),
