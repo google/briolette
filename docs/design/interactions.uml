@@ -1,0 +1,41 @@
+@startuml
+title
+ Example briolette interaction flow
+end title
+
+participant "Wallet" as W
+participant "Merchant Wallet" as Merchant
+participant "Bank Wallet" as Bank
+participant "Wallet Vendor Registrar" as WalletReg
+participant "Currency Operator Registrar" as TokenReg
+participant "Ticket Server" as Clerk
+participant "Mint Server" as Mint
+participant "Validation Server" as Validate
+participant "Token Map" as Tokenmap
+
+WalletReg-->Clerk: Register group issuing keys
+TokenReg-->Clerk: Register group issuing keys
+
+W<--WalletReg: Retrieve network credentials
+Merchant<--WalletReg: Retrieve network credentials
+Bank<--WalletReg: Retrieve network credentials
+
+W<--TokenReg: Retreive token transfer credentials
+Merchant<--TokenReg: Retreive token transfer credentials
+Bank<--TokenReg: Retreive token transfer credentials
+
+Clerk<--Tokenmap: Acquire latest revocation and state information
+W<--Clerk: Acquire current state configuration and tickets
+Merchant<--Clerk: Acquire current state configuration and tickets
+Bank<--Clerk: Acquire current state configuration and tickets
+
+Bank<--Mint: Receive tokens from the mint
+Mint-->Tokenmap: Update the tokenmap with the tokens and their current history
+
+W<--Bank: Withdraw tokens against a ticket from a bank account
+W-->Merchant: Pay for a purchase
+Merchant-->Bank: Deposit tokens
+Bank<-->Validate: Validates the deposited tokens
+Validate-->Tokenmap: Update token history and check for double spend.
+
+@enduml
