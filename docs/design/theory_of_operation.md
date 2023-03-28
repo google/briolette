@@ -181,7 +181,7 @@ friendly elliptic curves, for instance.
 
 Wallet registration is illustrated in the inline image below:
 
-![This image shows the sequence flow for a Briolette wallet. It was generated from text which can be found in src/wallet/docs/registration.uml.](../../src/wallet/docs/registration.png "Briolette Wallet Registration Flow")
+![This image shows the sequence flow for a briolette wallet. It was generated from text which can be found in src/wallet/docs/registration.uml.](../../src/wallet/docs/registration.png "Briolette Wallet Registration Flow")
 
 The wallet must be provisioned with some key matter in its factory such that it
 can prove to a registrar that it is a compliant wallet. This process, often
@@ -325,3 +325,7 @@ spending basename, but without additional information, the ticketing clerk
 would need to challenge every request and not just requests from specific
 hardware.  This is a useful tool in the case of expansive token abuse, but not
 expected to be the most common mechanism
+
+## Pulling it together: an example flow
+
+![This image shows the sequence flow from wallet registration to transference to validation.. It was generated from text which can be found in src/docs/design/interactions.uml.](interactions.png "example briolette interactions")
