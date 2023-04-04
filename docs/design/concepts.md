@@ -454,7 +454,7 @@ As explored earlier, assurance against double spending is a combination of the
 wallet's security assurances, current system-wide state, and the system policy
 configuration. The ability to tolerate network partitioning while maintaining
 availability creates a tradeoff in consistency which the overarching system
-design attempts toanage.
+design attempts to manage.
 
 That aside, there are cases where the above guarantees, both in the wallet
 stack and in atomicity, are insufficient. For higher valued transaction, it is
@@ -466,9 +466,9 @@ An operator may enable a transfer tag which allows an offline transfers to
 arrange online passive intermediary-based, or escrow, settlement where an
 additional party is not needed (e.g., for a secondhand purchase, not a real
 estate transaction).  The operator may add an escrow tag. The sender would send
-a token with a split value tag and and escrow tag.  The split value would leave
+a token with a split value tag and escrow tag.  The split value would leave
 the sender holding the remaining valued token which is unconstrained and the
-receiving holding a full value token with an escrow tag.  In this arrangement
+receiver holding a full value token with an escrow tag.  In this arrangement
 no other wallets will accept transference of the escrow "deposit" token except
 the original sender or the operator's swap service.  The escrow tag will set an
 expiration time on the arrangement.
@@ -492,7 +492,7 @@ needed as confirmation.
 #### Network service access
 
 As described in the section on wallet security, network services are not open
-for neral access.  All services may required a NAC signature with a rotating
+for general access.  All services may required a NAC signature with a rotating
 basename.  This is used to keep wallets from accessing network services too
 frequently for intentional or unintentional reasons. As there may be a very
 large number of wallets in use, it is important to provide denial of service
@@ -528,7 +528,7 @@ The selection of expiration dates, as well as any additional policies, will
 allow the operator to manage the boundaries of updates.
 
 In the proof of concept, the tokenmap stores the known history for all tokens.
-To detect double spending, the opetor must operate a service like this.
+To detect double spending, the operator must operate a service like this.
 There is no interdependence between tokens, however, so any such system shards
 very easily.  Tokens may be indexed using their unique minting signature (over
 the token base).  The history alongside any additional metadata may be stored,
@@ -598,7 +598,7 @@ token system entirely.
 
 
 The prior sections have provided a view on how briolette enables operators to
-manage their risk envelope through policy confuration and enforcement
+manage their risk envelope through policy configuration and enforcement
 mechanisms.  It is expected that these approaches should be modeled and
 simulated in order to help operators understand the expected mean time to
 detection of double spend as well as the mean time to revoke.  The specific
@@ -641,7 +641,7 @@ challenging areas:
 Operating any form of real-time settlement system will have costs which scale
 with the number of transactions in a given time period.  From reviewing public
 data, it appears that many real-time payment system costs scale at a
-superlinear rate with transactions.  Those systems that limit theimaximum
+superlinear rate with transactions.  Those systems that limit the maximum
 transactions also effectively manage their costs.
 
 In this system, transactions will be validated by the token system operator, or
@@ -710,7 +710,7 @@ additional exploration.
 
 Much like availability, retail users will expect to be able to realize the
 value of tokens they have received.  If a user discovers that they have a
-double spent token, thtoken system operator will be able to decide if they may
+double spent token, thee  token system operator will be able to decide if they may
 be compensated for the loss.  In many currency systems today, retail users are
 not compensated if they discover they have received a counterfeit note.  This
 system does not improve on that situation but may provide additional tools to
@@ -732,7 +732,7 @@ is allowed to perform a recovery.
 #### Privacy
 
 This system does not assert a specific privacy opinion, but instead attempts to
-follow the physical currency where possible.  The primary difference is the
+follow physical currency where possible.  The primary difference is the
 transaction history associated with each token.  While it is possible to build
 a transaction graph for physical currency, it is requires each participant in
 the graph to participate and then share their information with the currency
@@ -742,8 +742,8 @@ system level as it is with a digital system.
 With physical currency, counterfeiting is made difficult through the complex
 substrate the currency exists on.  For digital currency, counterfeiting takes
 the form of double spending because it is intrinsic that a perfect copy of the
-original token can be made.  As such, it can beade more difficult using
-secure hardware, as with the physical currency anti-countefeiting substrate. In
+original token can be made.  As such, it can be made more difficult using
+secure hardware, as with the physical currency anti-counterfeiting substrate. In
 that case, instead of the secure substrate being passed between users, the
 token is passed between secure substrates.  The transitive nature of the binding
 between token and substrate mean that the token system operator would have no means
@@ -892,7 +892,7 @@ wallet user:
     which links the address to the business cryptographically (and ideally in a
     human readable way).  This is intended to provide additional assurance
     against point of sales or online malicious-in-the-middle-style attacks.
-  - May provide tax ideification disclosure in receipts for the consumer and
+  - May provide tax identification disclosure in receipts for the consumer and
     linkage to the system operator to see funds received at a merchant address.
   - Must be able to delegate funds acceptance to frontend webservers or
     point-of-sales units without giving access to the keys necessary to spend
