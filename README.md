@@ -40,7 +40,11 @@ Further research on the underlying crypto approach under way to improve on
 ECDAA.
 
 See the [theory of operation](docs/design/theory_of_operation.md) for a more
-detailed design discussion.
+detailed description of how the system operates.
+
+See the [design concepts](docs/design/concepts.md) for a more detailed discussion
+of the underlying design objectives and how the proof of concept attempts to meet
+them.
 
 ## Building
 
