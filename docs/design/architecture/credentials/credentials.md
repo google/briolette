@@ -52,7 +52,7 @@ Epoch updates are not expected in real-time and as such, the generation of
 the new epoch data and signing process may be subject to high levels of
 assurance.
 
-## Network Access Credential (NAC) Issuer Key
+## Network Access Credential (NAC) Registrar Key
 
 Wallet vendors will have at least one NAC issuer key. This key is used to grant
 network access credentials to wallets. The associated group public key must be
@@ -71,7 +71,7 @@ linkable signatures over time periods.  This will allow operator services to
 limit requests from any given wallet during a time period without being able
 to uniquely identify that wallet in the future.
 
-## Token Transfer Credential (TTC) Issuer Key
+## Token Transfer Credential (TTC) Registrar Key
 
 This key is usually held by the system operator and is used to grant token
 transfer credentials to wallets.  Wallets will need to request a TTC upon
