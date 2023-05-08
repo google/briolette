@@ -78,9 +78,9 @@ Wallets carry two credentials:
 ## Tickets
 
 - Tickets are operator-signed randomized TTCs with policy attributes
-  - E.g., revocation group numnbers, lifetime, transaction value limits, etc
+  - E.g., revocation group numbers, lifetime, transaction value limits, etc
 - Tokens can only be transferred to valid, signed tickets
-  - they are used to bind a recieved token to the wallet
+  - they are used to bind a received token to the wallet
 - The next transfer must use the secret key associated with the fixated credential
 - Wallets must request tickets from the operator to transact
 - Operators can link some tickets together, based on issuance policy, but not all
@@ -109,7 +109,7 @@ A normal flow may look as follows
   - Propose payment: sends the token or tokens proposed to settle
   - Accept proposal: this is used if change making is needed or to reject invalid tokens
   - Send payment: transfer tokens and transmit
-  - Confirm payment: acknoledges receipt
+  - Confirm payment: acknowledges receipt
 
 Though single-shot payments are possible too.
 
@@ -122,7 +122,7 @@ A number of additional services must be exposed to fully operate the system
 - by the operator (or its delegates)
 
 These services are necessary to sustained operation of the system, but their
-uptime or performance is not related to transaction settlement or throughoput.
+up time or performance is not related to transaction settlement or throughput.
 
 ---
 ## Wallet Vendor Services
@@ -140,7 +140,7 @@ uptime or performance is not related to transaction settlement or throughoput.
 - _State server_ 
   - provides updates to the system epoch, configuration, and revocations
 - _Clerk server_ 
-  - certifies wallet addresses, as "tickets", enabling them to receive funds
+  - certifies wallet addresses, as "tickets", enabling them to receive tokens
 - _Validator server_ 
   - allows wallets to check, and update, a token's global consistency info
 - _Swap server_ 
@@ -162,6 +162,10 @@ Token recovery:
 Ticket KYC service
 
 - e.g., for high value transactions
+
+Online transaction services
+
+- e.g., escrow or merchant ticket certification
 
 ---
 ## Trust configuration
@@ -185,11 +189,9 @@ Wallets have some control over who they trust, however:
 - to accept tokens from non-operator mints (loyalty points, etc)
 
 ---
-## Sneak peek: Trust hierarchy
+## Visualized: Trust hierarchy
 
 ![diagram representing keys the flow of trust](../architecture/credentials/trust_hierarchy_class.svg)
-
-(We can come back to this)
 
 ---
 ## Double spending prevention
@@ -208,7 +210,7 @@ Secure hardware should provide
 - support wallet vendor NAC registrar validation
 - limit token transfer credentials to signing with a given basename once
   - this implies anti-rollback storage mechanism (monotonic counter, Merkle tree root storage, ...)
-- the interfaces and hardware should be built to a laboratory validatable standard
+- the interfaces and hardware should be built to a laboratory validated standard
 
 ---
 ## Cryptographic primitives
@@ -243,7 +245,7 @@ If a the provenance forks, a double spend has been detected.
   - if they add a split tag
 - Splits allow change to be made from larger value tokens
 - Splits are tags on transfers
-  - where the value specified is subtracted fron the original value
+  - where the value specified is subtracted from the original value
   - and kept with the prior signing ticket
 - The operator can choose to enable splits
   - and may do so for < 1.00 values or for any value
@@ -255,7 +257,7 @@ If a the provenance forks, a double spend has been detected.
 When a double spend is detected,
 - the TTC linkability signature pseudonym is extracted from token
   - this confirms the same double spender created the fork
-- the same is extracted from the NAC of the doubler spender's ticket
+- the same is extracted from the NAC of the double spender's ticket
 - the revocation group numbers are pulled from the ticket
   - and all tickets known issued at the same time
 - the revocation groups are pushed into a new state epoch for wallets
@@ -296,7 +298,7 @@ This concludes a technical overview of the system
 
 - All tokens are minted by the operator
   - and initially transferred to a treasury
-- Tiered expirations allows the treasury to hold or distribute the tokens
+- Tiered expiration allows the treasury to hold or distribute the tokens
 - The tokens are "fiat" currency if the operator is a central bank
 
 ---
