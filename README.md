@@ -56,6 +56,8 @@ Additionally, see
 [xaptum/ecdaa](https://github.com/xaptum/ecdaa/blob/master/doc/BUILDING.md) for
 any system requirements for building AMCL or ECDAA, such as libtss2.
 
+Diagram generation depends on [PlantUML](https://plantuml.com/).
+
 
 ### Building
 

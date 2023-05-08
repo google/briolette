@@ -69,3 +69,7 @@ pub mod registrar {
 pub mod receiver {
     tonic::include_proto!("briolette.receiver");
 }
+
+pub mod swapper {
+    tonic::include_proto!("briolette.swapper");
+}

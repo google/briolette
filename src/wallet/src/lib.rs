@@ -91,6 +91,8 @@ pub trait Wallet: Clone + Serialize + DeserializeOwned + Send {
     // Validate currently held tokens. Later this will enable recovery, but for
     // now it assures they are legitimate.
     async fn validate(&self) -> bool;
+    // Validates tokens which are not held.
+    async fn validate_tokens(&self, tokens: &Vec<token::Token>) -> bool;
 }
 
 #[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
@@ -241,6 +243,12 @@ impl From<TicketEntry> for token::SignedTicket {
             }),
             signature: item.signature,
         }
+    }
+}
+
+impl From<TokenEntry> for token::Token {
+    fn from(item: TokenEntry) -> Self {
+      token::Token::decode(item.token.as_slice()).unwrap()
     }
 }
 
@@ -675,18 +683,14 @@ impl Wallet for WalletData {
         return true;
     }
 
-    async fn validate(&self) -> bool {
-        if self.tokens.len() == 0 {
+    async fn validate_tokens(&self, tokens: &Vec<token::Token>) -> bool {
+        if tokens.len() == 0 {
             error!("No tokens to validate");
             return false;
         }
         let request = tonic::Request::new(ValidateTokensRequest {
             version: Version::Current.into(),
-            tokens: self
-                .tokens
-                .iter()
-                .map(|t| token::Token::decode(t.token.as_slice()).unwrap())
-                .collect(),
+            tokens: tokens.clone(),
         });
 
         match ValidateClient::connect(self.validate_uri.clone()).await {
@@ -716,6 +720,15 @@ impl Wallet for WalletData {
         }
         return false;
     }
+
+    async fn validate(&self) -> bool {
+        if self.tokens.len() == 0 {
+            error!("No tokens to validate");
+            return false;
+        }
+        let tokens: Vec<token::Token> = self.tokens.iter().map(|t| token::Token::decode(t.token.as_slice()).unwrap()).collect();
+        return self.validate_tokens(&tokens).await;
+    }
 }
 
 #[cfg(test)]
@@ -730,8 +743,8 @@ mod tests {
     use briolette_proto::briolette::ErrorCode as BrioletteErrorCode;
     use briolette_tokenmap::server::BrioletteTokenMap;
     use briolette_validate::server::BrioletteValidate;
-    use ette_clerk::server::BrioletteClerk;
-    use ette_registrar::server::BrioletteRegistrar;
+    use briolette_clerk::server::BrioletteClerk;
+    use briolette_registrar::server::BrioletteRegistrar;
     use glob::glob;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tokio::net::TcpListener;
@@ -861,7 +874,7 @@ mod tests {
         let (tx, rx) = oneshot::channel::<u16>();
         tokio::spawn(async move {
             println!("Launching test clerk...");
-            println!("Ensure ette-clerk-server has generated clerk.state before running.");
+            println!("Ensure briolette-clerk-server has generated clerk.state before running.");
             // The ette-clerk-server must be called with registrar data above.
             let mut clerk = BrioletteClerk::load(Path::new("../clerk/data/clerk.state")).unwrap();
             clerk.tokenmap_uri = tokenmap_uri;

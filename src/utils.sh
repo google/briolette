@@ -85,9 +85,12 @@ start_servers() {
         sleep 5 
 
         run_server validate
+        run_server swapper
         run_server receiver
 
         run_client receiver
+
+	# run_client swapper
 }
 
 kill_bg() {

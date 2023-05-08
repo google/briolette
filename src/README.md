@@ -8,6 +8,7 @@ Each subdirectory contains a prototype implementation of the named service:
     * trim/
     * validate/
     * tokenmap/
+    * swapper/
 
 With a common crypto interface under crypto/ and a sample wallet under wallet/ and
 a default funds receiving service under receiver/.
@@ -85,23 +86,13 @@ create a revocation event.  Additionally, once a double spend is detected,
 currently all versions of the coin are considered suspect. This policy is
 configurable based on the implementation in tokenmap.
 
-## Trim
+## Swapper
 
-(Not yet implemented)
-Receives tokens from a wallet with a proof of possession (0 split to the trim
-server) where the history stops with the wallet and returns a new history for
-the token.  Tokens can only have a policy-determined history length.
+Receives a token transferred to its address and returns a new token
+transferred to the sender (using the ticket from the transferred token).
 
 Prior to issuance, a call to validate will be made for the token. If all is
-valid, then the trimmed history is treated as an extension of the prior history
-in the tokenmap.
-
-There are two ways to do this -- one favors the server and the other, the client.
-Trimming avoids the wallet potentially losing funds do to connectivity or
-system failure as the server sends the new history down.  However, it opens up
-yet another double spend detection path.  The other option, the wallet transfers
-the funds to the server (keeping a backup copy in case of interruption) and the
-server then returns either the trimmed currency or an equivalent value note.
+valid, then the token will be swapped.
 
 ## Recovery
 
