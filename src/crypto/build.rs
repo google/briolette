@@ -15,21 +15,27 @@
 extern crate cc;
 use std::env;
 use std::path::Path;
+use std::process::Command;
 
 fn main() {
-    println!("cargo:rerun-if-changed=v0_wrapper.c");
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    println!("cargo:rerun-if-changed=src/v0_wrapper.c");
+    Command::new("/bin/bash")
+            .arg("-c")
+            .arg("./build-deps.sh")
+            .output()
+            .expect("failed to execute process");
+    let out_dir = env::var("OUT_DIR").unwrap();
     println!(
         "cargo:rustc-link-search={}",
-        Path::new(&manifest_dir)
+        Path::new(&out_dir)
             .join("deps/ecdaa/build/libecdaa")
-            .display() // Path::new(&manifest_dir).join("libs").display()
+            .display() // Path::new(&out_dir).join("libs").display()
     );
     println!(
         "cargo:rustc-link-search={}",
-        Path::new(&manifest_dir)
+        Path::new(&out_dir)
             .join("deps/ecdaa/build/deps/lib")
-            .display() // Path::new(&manifest_dir).join("libs").display()
+            .display() // Path::new(&out_dir).join("libs").display()
     );
 
     println!("cargo:rustc-link-lib=static=ecdaa");
@@ -37,10 +43,10 @@ fn main() {
     println!("cargo:rustc-link-lib=static=amcl_curve_FP256BN");
     println!("cargo:rustc-link-lib=static=amcl_pairing_FP256BN");
 
-    let amcl_include = Path::new(&manifest_dir).join("deps/ecdaa/build/deps/include");
-    let ecdaa_gen_include = Path::new(&manifest_dir).join("deps/ecdaa/build/libecdaa/include");
+    let amcl_include = Path::new(&out_dir).join("deps/ecdaa/build/deps/include");
+    let ecdaa_gen_include = Path::new(&out_dir).join("deps/ecdaa/build/libecdaa/include");
 
-    let ecdaa_include = Path::new(&manifest_dir).join("deps/ecdaa/libecdaa/include");
+    let ecdaa_include = Path::new(&out_dir).join("deps/ecdaa/libecdaa/include");
     cc::Build::new()
         .file("src/v0_wrapper.c")
         .include(amcl_include)

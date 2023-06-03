@@ -16,36 +16,6 @@
 # To use:
 #  source utils.sh
 
-build_external() {
-                pushd crypto
-                bash build-deps.sh
-                popd
-}
-build() {
-
-        if [ ! -d crypto/deps ]; then
-                echo "Run build_external first!"
-                return 1
-        fi
-
-        for dir in $(ls -F | grep /); do
-                pushd $dir &> /dev/null
-                echo "Building $dir . . ."
-                (rm data/* || true) &>/dev/null
-                cargo build
-                popd &> /dev/null
-        done
-}
-
-clean() {
-for dir in $(ls -F | grep /); do
-        pushd $dir &> /dev/null
-        (rm data/* || true) &>/dev/null
-        cargo clean
-        popd &> /dev/null
-done
-}
-
 clear_data() {
 for dir in $(ls -F | grep /); do
         pushd $dir &> /dev/null

@@ -1,0 +1,9 @@
+[workspace]
+members = ["src/*/"]
+exclude = ["src/simulation"]
+
+[workspace.package]
+version = "0.0.1"
+authors = ["The Briolette Authors"]
+description = "A short description of my package"
+documentation = "https://github.com/google/briolette"

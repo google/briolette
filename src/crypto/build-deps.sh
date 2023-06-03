@@ -15,8 +15,20 @@
 
 set -o errexit
 
-mkdir -p deps
-cd deps
+echo "Checking if \$CARGO_MANIFEST_DIR is set . . ."
+if test -z "$CARGO_MANIFEST_DIR"; then
+  echo "CARGO_MANIFEST_DIR must be set."
+  exit 1
+fi
+
+echo "Checking if \$OUT_DIR is set . . ."
+if test -z "$OUT_DIR"; then
+  echo "OUT_DIR must be set."
+  exit 1
+fi
+
+mkdir -p $OUT_DIR/deps
+cd $OUT_DIR/deps
 
 echo "Fetching external dependencies . . ."
 if [ ! -d amcl ]; then
@@ -28,7 +40,7 @@ if [ ! -d ecdaa ]; then
   echo "Applying patches . . ."
   pushd ecdaa
   mkdir -p build/deps
-  patch -p1 <../../../../third_party/libecdaa.patch
+  patch -p1 <$CARGO_MANIFEST_DIR/../../third_party/libecdaa.patch || exit 1
   popd
 fi
 
