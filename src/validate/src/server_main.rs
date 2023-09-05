@@ -13,10 +13,49 @@
 // limitations under the License.
 
 use briolette_validate::server::BrioletteValidate;
+use clap::Parser as ClapParser;
 use log::*;
+use std::path::PathBuf;
 use tokio;
 
 use briolette_proto::briolette::validate::validate_server::ValidateServer;
+
+#[derive(ClapParser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    // Address to listen on
+    #[arg(
+        short = 'l',
+        long,
+        value_name = "IP:PORT",
+        default_value = "[::1]:50055"
+    )]
+    listen_address: String,
+    // Path to Epoch public signing key
+    #[arg(
+        short = 'E',
+        long,
+        value_name = "FILE",
+        default_value = "data/clerk/epoch.pk"
+    )]
+    epoch_signing_public_key: PathBuf,
+    // TokenMap server URI
+    #[arg(
+        short = 'm',
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50054"
+    )]
+    tokenmap_uri: String,
+    // Clerk server URI
+    #[arg(
+        short = 'c',
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50052"
+    )]
+    clerk_uri: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,17 +65,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .timestamp(stderrlog::Timestamp::Millisecond)
         .init()
         .unwrap();
-    let addr = "[::1]:50055".parse().unwrap();
-    let tokenmap_uri = "http://[::1]:50054".to_string();
-    let clerk_uri = "http://[::1]:50052".to_string();
-    let epoch_pk = std::fs::read("../clerk/data/epoch.pk").expect("clerk/data not populated yet");
-    info!("Setting up server...");
-    let validate = BrioletteValidate::new(clerk_uri, tokenmap_uri, epoch_pk)
-        .await
-        .unwrap();
-    tonic::transport::Server::builder()
-        .add_service(ValidateServer::new(validate))
-        .serve(addr)
-        .await?;
+    let args = Args::parse();
+    let addr = args.listen_address.parse().unwrap();
+    let epoch_pk =
+        std::fs::read(&args.epoch_signing_public_key).expect("data/clerk not populated yet");
+    info!("Fetching initial EpochUpdate from {}", args.clerk_uri);
+    if let Ok(eu) = BrioletteValidate::fetch_epoch_update(&args.clerk_uri, &epoch_pk).await {
+        info!("Setting up server...");
+        let validate = BrioletteValidate::new(&eu).await.unwrap();
+        // TODO(redpig) add a task which fetches the new EpochUpdates after the defined interval
+        tonic::transport::Server::builder()
+            .add_service(ValidateServer::new(validate))
+            .serve(addr)
+            .await?;
+    } else {
+        error!("Failed to acquire a valid EpochUpdate!");
+        assert!(false);
+    }
     Ok(())
 }

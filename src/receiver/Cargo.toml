@@ -20,6 +20,7 @@ briolette-proto = { path = "../proto", version = "*" }
 briolette-wallet = { path = "../wallet", version = "*" }
 log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_info"]}
 stderrlog = "0.5.4"
+clap = { version = "4.3.2", features = ["derive"] }
 
 [build-dependencies]
 tonic-build = "0.8"

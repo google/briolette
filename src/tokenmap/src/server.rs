@@ -667,8 +667,6 @@ fn token_is_second_split(candidate: &Token, tokens: &Vec<Token>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn token_is_known_ok() {
         assert_eq!(4, 4);

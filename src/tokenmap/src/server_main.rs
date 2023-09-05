@@ -12,10 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use briolette_proto::briolette::tokenmap::token_map_server::TokenMapServer;
 use briolette_tokenmap::server::BrioletteTokenMap;
+use clap::Parser as ClapParser;
+use std::path::PathBuf;
 use tokio;
 
-use briolette_proto::briolette::tokenmap::token_map_server::TokenMapServer;
+#[derive(ClapParser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    // Address to listen on
+    #[arg(
+        short = 'l',
+        long,
+        value_name = "IP:PORT",
+        default_value = "[::1]:50054"
+    )]
+    listen_address: String,
+    // Path to Epoch public signing key
+    #[arg(
+        short = 'D',
+        long,
+        value_name = "FILE",
+        default_value = "data/tokenmap/tokenmap.db"
+    )]
+    database: PathBuf,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,12 +47,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .timestamp(stderrlog::Timestamp::Millisecond)
         .init()
         .unwrap();
-    let addr = "[::1]:50054".parse().unwrap();
-    // TODO: load in the necessary public keys!
-    //let ttc_gpk = std::fs::read("../registrar/data/wallet.ttc.gpk")
-    //    .expect("registrar/data/wallet.ttc.gpk not populated yet");
-    //let ticket_pk = std::fs::read("../clerk/data/ticket.pk").expect("clerk/data not populated yet");
-    let tokenmap = BrioletteTokenMap::new(&"data/tokenmap.db".to_string()).await?;
+    let args = Args::parse();
+    let addr = args.listen_address.parse().unwrap();
+    let tokenmap =
+        BrioletteTokenMap::new(&args.database.as_path().to_str().unwrap().to_string()).await?;
     tonic::transport::Server::builder()
         .add_service(TokenMapServer::new(tokenmap))
         .serve(addr)

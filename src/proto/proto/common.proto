@@ -60,3 +60,29 @@ enum ErrorCode {
 message Error {
     ErrorCode code = 1;
 }
+
+message ServiceMapEntry {
+    ServiceName name = 1;
+    string uri = 2;
+}
+
+
+// Declares service types in the service map
+// The ServiceLocationMap is used both in the public EpochUpdate
+// as well as in a (TBD) private configuration message used to
+// configure all the servers dynamically from a configuration server.
+// The private services begin with an underscore.
+enum ServiceName {
+    REGISTRAR = 0;
+    TICKET = 1;
+    EPOCH = 2;
+    VALIDATE = 3;
+    SWAP = 4;
+    _TOKENMAP = 5;
+    _MINT = 6;
+    _CONFIGURATION = 7;
+}
+
+message ServiceMap {
+  repeated ServiceMapEntry services = 1;
+}

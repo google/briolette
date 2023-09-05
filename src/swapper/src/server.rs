@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use briolette_proto::briolette::token::{Token, SignedTicket};
-use briolette_proto::briolette::swapper::{SwapTokensReply, SwapTokensRequest, GetDestinationReply, GetDestinationRequest};
+use briolette_proto::briolette::swapper::{
+    GetDestinationReply, GetDestinationRequest, SwapTokensReply, SwapTokensRequest,
+};
+use briolette_proto::briolette::token::{SignedTicket, Token};
 use briolette_proto::briolette::Version;
 use briolette_proto::briolette::{Error as BrioletteError, ErrorCode as BrioletteErrorCode};
 use briolette_wallet::{Wallet, WalletData};
+use log::*;
 use prost::Message;
 use std::sync::{Arc, RwLock};
-use log::*;
 
 #[derive(Debug, Clone)]
 pub struct BrioletteSwapper {
@@ -59,7 +61,7 @@ impl BrioletteSwapper {
         reply.swap_ticket = Some(self.ticket.clone());
         return Ok(reply);
     }
- 
+
     pub async fn swap_tokens_impl(
         &self,
         request: &SwapTokensRequest,
@@ -84,24 +86,68 @@ impl BrioletteSwapper {
         // TODO: Refactor the wallet data and services to avoid this.
         let wallet_shell = self.wallet.read().unwrap().clone();
         if wallet_shell.validate_tokens(&request.tokens.clone()).await {
-          for token in request.tokens.iter() {
-            let sender;
-            let destination;
-            if token.history.len() > 1 {
-              sender = token.history.iter().last().unwrap().transfer.as_ref().unwrap().recipient.as_ref().unwrap();
-            } else {
-              sender = token.base.as_ref().unwrap().transfer.as_ref().unwrap().recipient.as_ref().unwrap();
-            }
-            destination = token.history.iter().last().unwrap().transfer.as_ref().unwrap().recipient.as_ref().unwrap();
-            // 4. For each token transferred to the swapper, transfer a token to the sender.
-            if destination.ticket.as_ref().unwrap().credential  == self.ticket.ticket.as_ref().unwrap().credential {
-                // TODO: Handle being out of tokens and different values, whole and fractional
-                if self.wallet.write().unwrap().transfer(token.descriptor.as_ref().unwrap().value.clone().unwrap().whole as u32, sender.clone().encode_to_vec()) == true {
-                    let pending = self.wallet.write().unwrap().pending_tokens.pop().unwrap();
-                    reply.tokens.push(Token::decode(pending.as_slice()).unwrap());
+            for token in request.tokens.iter() {
+                let sender;
+                let destination;
+                if token.history.len() > 1 {
+                    sender = token
+                        .history
+                        .iter()
+                        .last()
+                        .unwrap()
+                        .transfer
+                        .as_ref()
+                        .unwrap()
+                        .recipient
+                        .as_ref()
+                        .unwrap();
+                } else {
+                    sender = token
+                        .base
+                        .as_ref()
+                        .unwrap()
+                        .transfer
+                        .as_ref()
+                        .unwrap()
+                        .recipient
+                        .as_ref()
+                        .unwrap();
+                }
+                destination = token
+                    .history
+                    .iter()
+                    .last()
+                    .unwrap()
+                    .transfer
+                    .as_ref()
+                    .unwrap()
+                    .recipient
+                    .as_ref()
+                    .unwrap();
+                // 4. For each token transferred to the swapper, transfer a token to the sender.
+                if destination.ticket.as_ref().unwrap().credential
+                    == self.ticket.ticket.as_ref().unwrap().credential
+                {
+                    // TODO: Handle being out of tokens and different values, whole and fractional
+                    if self.wallet.write().unwrap().transfer(
+                        token
+                            .descriptor
+                            .as_ref()
+                            .unwrap()
+                            .value
+                            .clone()
+                            .unwrap()
+                            .whole as u32,
+                        sender.clone().encode_to_vec(),
+                    ) == true
+                    {
+                        let pending = self.wallet.write().unwrap().pending_tokens.pop().unwrap();
+                        reply
+                            .tokens
+                            .push(Token::decode(pending.as_slice()).unwrap());
+                    }
                 }
             }
-          }
         }
         return Ok(reply);
     }

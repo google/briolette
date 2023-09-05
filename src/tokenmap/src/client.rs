@@ -16,12 +16,28 @@ use briolette_proto::briolette::tokenmap::token_map_client::TokenMapClient;
 use briolette_proto::briolette::tokenmap::{
     revocation_data_request::Select, RevocationDataRequest, SelectGroup,
 };
+use clap::Parser as ClapParser;
 
 use tokio;
 
+#[derive(ClapParser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    // Address to listen on
+    #[arg(
+        short = 's',
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50054"
+    )]
+    server_address: String,
+    // TODO(redpig) add different commands
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = TokenMapClient::connect("http://[::1]:50054").await?;
+    let args = Args::parse();
+    let mut client = TokenMapClient::connect(args.server_address).await?;
 
     let request = RevocationDataRequest {
         select: Some(Select::Group(SelectGroup::All.into())),

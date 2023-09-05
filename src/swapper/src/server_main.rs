@@ -13,10 +13,56 @@
 // limitations under the License.
 
 use briolette_swapper::server::BrioletteSwapper;
+use clap::Parser as ClapParser;
 use log::*;
 use tokio;
 
 use briolette_proto::briolette::swapper::swapper_server::SwapperServer;
+
+#[derive(ClapParser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    // Address to listen on
+    #[arg(
+        short = 'l',
+        long,
+        value_name = "IP:PORT",
+        default_value = "[::1]:50057"
+    )]
+    listen_address: String,
+    // Registrar server URI
+    #[arg(
+        short = 'r',
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50051"
+    )]
+    registrar_uri: String,
+    // Mint server URI
+    #[arg(
+        short = 'm',
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50053"
+    )]
+    mint_uri: String,
+    // Clerk server URI
+    #[arg(
+        short = 'c',
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50052"
+    )]
+    clerk_uri: String,
+    // Validate server URI
+    #[arg(
+        short = 'v',
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50055"
+    )]
+    validate_uri: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,15 +72,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .timestamp(stderrlog::Timestamp::Millisecond)
         .init()
         .unwrap();
-    let addr = "[::1]:50057".parse().unwrap();
-    let registrar_uri = "http://[::1]:50051".to_string();
-    let clerk_uri = "http://[::1]:50052".to_string();
-    let mint_uri = "http://[::1]:50053".to_string();
-    let validate_uri = "http://[::1]:50055".to_string();
+    let args = Args::parse();
+    let addr = args.listen_address.parse().unwrap();
     info!("Setting up swapper server...");
-    let swapper: BrioletteSwapper = BrioletteSwapper::new(registrar_uri, clerk_uri, mint_uri, validate_uri)
-        .await
-        .unwrap();
+    let swapper: BrioletteSwapper = BrioletteSwapper::new(
+        args.registrar_uri,
+        args.clerk_uri,
+        args.mint_uri,
+        args.validate_uri,
+    )
+    .await
+    .unwrap();
     tonic::transport::Server::builder()
         .add_service(SwapperServer::new(swapper))
         .serve(addr)

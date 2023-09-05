@@ -14,8 +14,8 @@
 
 use briolette_proto::briolette::swapper::swapper_client::SwapperClient;
 
+use briolette_proto::briolette::swapper::{GetDestinationRequest, SwapTokensRequest};
 use briolette_proto::briolette::token;
-use briolette_proto::briolette::swapper::{SwapTokensRequest, GetDestinationRequest};
 use briolette_wallet::{Wallet, WalletData};
 
 use prost::Message;
@@ -73,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert!(swaps.len() == 5);
     wallet.pending_tokens.clear();
     for t in swaps {
-      wallet.tokens.push(t.into());
+        wallet.tokens.push(t.into());
     }
     // TODO: check the credential
     assert!(wallet.validate().await);

@@ -24,7 +24,7 @@ use briolette_proto::briolette::{Error as BrioletteError, ErrorCode as Briolette
 use briolette_proto::briolette::Version;
 
 use bytes::Bytes;
-use p256::pkcs8::{EncodePrivateKey, EncodePublicKey};
+use p256::pkcs8::{EncodePrivateKey, EncodePublicKey, DecodePrivateKey};
 
 use briolette_crypto::v0;
 use ecdsa::RecoveryId;
@@ -125,9 +125,9 @@ impl BrioletteClerk {
     }
 
     // Generates new keys for ticket signing.
-    pub fn new(os_rng: &mut OsRng, epoch_public_key: &VerifyingKey, tokenmap_uri: String) -> Self {
+    pub fn new(ticket_secret_key: &Vec<u8>, epoch_public_key: &VerifyingKey, tokenmap_uri: String) -> Self {
         Self {
-            ticket_signing_key: SigningKey::random(os_rng), // TODO(wad) make seed/mock able.
+            ticket_signing_key: SecretKey::from_pkcs8_der(ticket_secret_key.as_slice()).unwrap().into(),
             epoch_verifying_key: epoch_public_key.clone(),
             epoch_update: Arc::new(RwLock::new(None)),
             tokenmap_uri,
