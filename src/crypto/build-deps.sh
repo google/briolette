@@ -15,6 +15,12 @@
 
 set -o errexit
 
+echo "Checking for CMake . . ."
+if ! type -f cmake &>/dev/null; then
+  echo "CMake must be installed and in the PATH."
+  exit 1
+fi
+
 echo "Checking if \$CARGO_MANIFEST_DIR is set . . ."
 if test -z "$CARGO_MANIFEST_DIR"; then
   echo "CARGO_MANIFEST_DIR must be set."
@@ -42,6 +48,18 @@ if [ ! -d ecdaa ]; then
   mkdir -p build/deps
   patch -p1 <$CARGO_MANIFEST_DIR/../../third_party/libecdaa.patch || exit 1
   popd
+
+  # Minimum required deprecation can trigger FATAL checks in the repos 
+  if test $(cmake -version | head -1 | cut -f3 -d' ' | cut -f2 -d. ) -ge 27; then
+    echo "Updating minimum CMake version clauses . . ."
+    pushd amcl
+    grep -rl 'cmake_minimum_required(VERSION 3.1' . | xargs sed -i -e "s/VERSION 3.1/VERSION 3.5/"
+    popd
+    pushd ecdaa
+    grep -rl 'cmake_minimum_required(VERSION 3.0' . | xargs sed -i -e "s/VERSION 3.0/VERSION 3.5/"
+    popd
+  fi
+
 fi
 
 echo "Building AMCL . . ."
@@ -49,14 +67,14 @@ echo "Building AMCL . . ."
 unset  C_INCLUDE_PATH
 export ECDAA_CURVES=FP256BN
 pushd amcl
-cmake . -DCMAKE_INSTALL_PREFIX=../ecdaa/build/deps -DAMCL_CURVE=${ECDAA_CURVES} -DAMCL_RSA="" -DAMCL_INCLUDE_SUBDIR=amcl -DBUILD_PYTHON=Off -DBUILD_MPIN=Off -DBUILD_WCC=Off -DBUILD_DOCS=Off  -DBUILD_SHARED_LIBS=Off
+cmake . -DCMAKE_INSTALL_PREFIX=../ecdaa/build/deps -DAMCL_CURVE=${ECDAA_CURVES} -DAMCL_RSA="" -DAMCL_INCLUDE_SUBDIR=amcl -DBUILD_PYTHON=Off -DBUILD_MPIN=Off -DBUILD_WCC=Off -DBUILD_DOCS=Off  -DBUILD_SHARED_LIBS=Off -DECDAA_TPM_SUPPORT=OFF
 cmake --build .
 cmake --build . --target install
 popd
 
 echo "Building ECDAA . . ."
 pushd ecdaa/build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DECDAA_CURVES=${ECDAA_CURVES} -DTEST_USE_TCP_TPM=ON -DBUILD_EXAMPLES=OFF -DBUILD_SHARED_LIBS=OFF -DAMCL_DIR=$(realpath $PWD/deps/lib/cmake/amcl/)
+cmake .. -DCMAKE_BUILD_TYPE=Release -DECDAA_CURVES=${ECDAA_CURVES} -DTEST_USE_TCP_TPM=OFF -DBUILD_EXAMPLES=OFF -DBUILD_SHARED_LIBS=OFF -DAMCL_DIR=$(realpath $PWD/deps/lib/cmake/amcl/) -DECDAA_TPM_SUPPORT=OFF
 cmake --build .
 popd
 
