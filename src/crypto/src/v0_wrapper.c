@@ -38,8 +38,8 @@
 static void wrapper_rand256(void *buf, size_t buflen)
 {
     ssize_t read_ret = getentropy(buf, buflen);
-    if (read_ret == -1 || (size_t)read_ret != buflen) {
-        logf("getentropy() failed. Ret=%zd, errno=%d\n", read_ret, errno);
+    if (read_ret == -1 || read_ret != 0) {
+        logf("wrapper_rand256:getentropy(buflen=%zu) failed. Ret=%zd, errno=%d\n", buflen, read_ret, errno);
         exit(1);
     }
 }
