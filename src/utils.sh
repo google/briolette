@@ -17,22 +17,17 @@
 #  source utils.sh
 
 clear_data() {
-for dir in $(ls -F | grep /); do
-        pushd $dir &> /dev/null
-        (rm data/* || true) &>/dev/null
-        popd &> /dev/null
+for dir in $(ls -F data/ | grep /); do
+    (rm $dir/* || true) &>/dev/null
 done
 }
 
 run_cmd_at() {
         name="$1"
         t="$2"
-        pushd "$name"
         echo "Starting $t in $name..."
-        target/debug/briolette-${name}-${t} &
-        popd
+        cargo run --bin briolette-${name}-${t} &
         sleep 1
-
 }
 
 run_server() {

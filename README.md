@@ -59,7 +59,7 @@ Your system will need to have the [Rust](https://www.rust-lang.org/) programming
 
 Additionally, see
 [xaptum/ecdaa](https://github.com/xaptum/ecdaa/blob/master/doc/BUILDING.md) for
-any system requirements for building AMCL or ECDAA, such as cmake and libtss2.
+any system requirements for building AMCL or ECDAA, such as cmake.
 
 Diagram generation depends on [PlantUML](https://plantuml.com/).
 
