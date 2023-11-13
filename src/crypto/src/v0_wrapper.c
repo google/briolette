@@ -35,13 +35,26 @@
         } \
       }
 
-static void wrapper_rand(void *buf, size_t buflen)
+static void wrapper_rand256(void *buf, size_t buflen)
 {
-    ssize_t read_ret = getrandom(buf, buflen, 0);
-    if (read_ret == -1 || (size_t)read_ret != buflen) {
-        logf("getrandom() failed. Ret=%zd, errno=%d\n", read_ret, errno);
+    ssize_t read_ret = getentropy(buf, buflen);
+    if (read_ret == -1 || read_ret != 0) {
+        logf("wrapper_rand256:getentropy(buflen=%zu) failed. Ret=%zd, errno=%d\n", buflen, read_ret, errno);
         exit(1);
     }
+}
+
+
+static void wrapper_rand(void *buf, size_t buflen)
+{
+    void *b = buf;
+    size_t remaining = buflen;
+    do {
+      size_t len = remaining > 256 ? 256 : remaining;
+      wrapper_rand256(b, len);
+      b += len;
+      remaining -= len;
+    } while (remaining > 0 && b < buf + buflen);
 }
 
 int generate_wallet_keypair(uint8_t* secret_key, size_t secret_key_len,

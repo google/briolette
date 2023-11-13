@@ -1,0 +1,9 @@
+[workspace]
+members = ["src/*/"]
+exclude = ["src/simulation"]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["The Briolette Authors"]
+description = "an experimental framework for researching direct-exchange digital currency designs"
+documentation = "https://github.com/google/briolette"

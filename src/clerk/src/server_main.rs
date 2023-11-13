@@ -80,19 +80,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut pk: Vec<u8> = vec![];
     read_or_generate_key(
-        &Path::new("data/epoch.sk"),
-        &Path::new("data/epoch.pk"),
+        &Path::new("data/clerk/epoch.sk"),
+        &Path::new("data/clerk/epoch.pk"),
         &mut pk,
     );
     let epoch_pk = PublicKey::from_public_key_der(pk.as_slice()).unwrap();
     let epoch_vk: VerifyingKey = epoch_pk.into();
     let clerk;
-    if let Ok(loaded_clerk) = BrioletteClerk::load(Path::new("data/clerk.state")) {
+    if let Ok(loaded_clerk) = BrioletteClerk::load(Path::new("data/clerk/clerk.state")) {
         clerk = loaded_clerk;
     } else {
         clerk = BrioletteClerk::new(&mut OsRng, &epoch_vk, tokenmap_uri);
-        clerk.store(Path::new("data/clerk.state")).unwrap();
-        clerk.write_public_key(Path::new("data/ticket.pk")).unwrap();
+        clerk.store(Path::new("data/clerk/clerk.state")).unwrap();
+        clerk.write_public_key(Path::new("data/clerk/ticket.pk")).unwrap();
     }
     tonic::transport::Server::builder()
         .add_service(ClerkServer::new(clerk))

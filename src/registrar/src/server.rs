@@ -64,12 +64,12 @@ impl BrioletteRegistrar {
             );
             let result = v0::generate_issuer_keypair(sk, gpk);
             if result == false {
-                error!("failed to generate issuer keypair (ettecrypto)");
+                error!("failed to generate issuer keypair");
                 return false;
             }
             // Attempt to update the supplied path with the new keys.
             if !secret_key_file.as_os_str().is_empty() {
-                std::fs::write(secret_key_file, sk).unwrap();
+                std::fs::write(secret_key_file, sk).unwrap_or_else(|_| panic!("could not write secret key to: {:?}/{:?}",  std::env::current_dir().unwrap(), secret_key_file));
             }
             if !group_public_key_file.as_os_str().is_empty() {
                 std::fs::write(group_public_key_file, gpk).unwrap();

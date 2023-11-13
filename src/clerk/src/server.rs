@@ -303,9 +303,9 @@ impl BrioletteClerk {
             trace!("Releasing write lock...");
         }
         // Store our latest state
-        // TODO: clean this up.
+        // TODO: PARAMETERIZE
         trace!("Writing to disk...");
-        if let Err(_e) = self.store(&Path::new("data/clerk.state")) {
+        if let Err(_e) = self.store(&Path::new("data/clerk/clerk.state")) {
             return Err(BrioletteError {
                 code: BrioletteErrorCode::ServerDiskError.into(),
             });

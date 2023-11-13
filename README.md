@@ -59,24 +59,23 @@ Your system will need to have the [Rust](https://www.rust-lang.org/) programming
 
 Additionally, see
 [xaptum/ecdaa](https://github.com/xaptum/ecdaa/blob/master/doc/BUILDING.md) for
-any system requirements for building AMCL or ECDAA, such as libtss2.
+any system requirements for building AMCL or ECDAA, such as cmake.
 
 Diagram generation depends on [PlantUML](https://plantuml.com/).
 
 
 ### Building
 
-The easiest way to build is to use the utils.sh bash helper:
+The easiest way to build is to use cargo from the root directory (where this file is):
 
-    cd src
-    source utils.sh
-    build_external
-    build
+  cargo build
+
 
 ## Running
 
-If you are using utils.sh, simply run
+Simply run:
 
+    source src/utils.sh
     start_servers
 
 
