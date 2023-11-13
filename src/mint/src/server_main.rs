@@ -75,13 +75,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tokenmap_addr = "http://[::1]:50054".to_string();
     let mut sk = vec![];
     assert!(read_or_generate_key(
-        &Path::new("data/mint.sk"),
-        &Path::new("data/mint.pk"),
+        &Path::new("data/mint/mint.sk"),
+        &Path::new("data/mint/mint.pk"),
         &mut sk,
     ));
-    let ttc_gpk = std::fs::read("../registrar/data/wallet.ttc.gpk")
-        .expect("registrar/data/wallet.ttc.gpk not populated yet");
-    let ticket_pk = std::fs::read("../clerk/data/ticket.pk").expect("clerk/data not populated yet");
+    let ttc_gpk = std::fs::read("data/registrar/ttc_issuer.gpk")
+        .expect("data/registrar/wallet.ttc.gpk not populated yet");
+    let ticket_pk = std::fs::read("data/clerk/ticket.pk").expect("data/clerk not populated yet");
     let mint = BrioletteMint::new(sk, ttc_gpk, vec![ticket_pk], tokenmap_addr).unwrap();
     tonic::transport::Server::builder()
         .add_service(MintServer::new(mint))

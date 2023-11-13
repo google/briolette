@@ -83,14 +83,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Write out the credentials to disk.
     let msg = response.into_inner();
     if let Some(nac_cred) = msg.network_credential {
-        std::fs::write(&Path::new("data/wallet.nac.cred"), nac_cred.credential).unwrap();
-        std::fs::write(&Path::new("data/wallet.nac.gpk"), nac_cred.group_public_key).unwrap();
-        std::fs::write(&Path::new("data/wallet.nac.sk"), network_req.secret_key).unwrap();
+        std::fs::write(&Path::new("data/wallet/nac.cred"), nac_cred.credential).unwrap();
+        std::fs::write(&Path::new("data/wallet/nac.gpk"), nac_cred.group_public_key).unwrap();
+        std::fs::write(&Path::new("data/wallet/nac.sk"), network_req.secret_key).unwrap();
     }
     if let Some(ttc_cred) = msg.transfer_credential {
-        std::fs::write(&Path::new("data/wallet.ttc.cred"), ttc_cred.credential).unwrap();
-        std::fs::write(&Path::new("data/wallet.ttc.gpk"), ttc_cred.group_public_key).unwrap();
-        std::fs::write(&Path::new("data/wallet.ttc.sk"), transfer_req.secret_key).unwrap();
+        std::fs::write(&Path::new("data/wallet/ttc.cred"), ttc_cred.credential).unwrap();
+        std::fs::write(&Path::new("data/wallet/ttc.gpk"), ttc_cred.group_public_key).unwrap();
+        std::fs::write(&Path::new("data/wallet/ttc.sk"), transfer_req.secret_key).unwrap();
     }
 
     Ok(())
