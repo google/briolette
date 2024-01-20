@@ -22,6 +22,9 @@ use briolette_proto::briolette::validate::{ValidateTokensReply, ValidateTokensRe
 use briolette_proto::briolette::Version;
 use briolette_proto::briolette::{Error as BrioletteError, ErrorCode as BrioletteErrorCode};
 use briolette_proto::briolette::{ServiceMapInterface, ServiceName};
+use briolette_proto::BrioletteClientHelper;
+
+use tonic::transport::Uri;
 
 use log::*;
 use std::sync::RwLock;
@@ -92,7 +95,10 @@ impl BrioletteValidate {
         // TODO: make this more sensible
         let mut reply = ValidateTokensReply::default();
         for token in request.tokens.iter() {
-            if Self::check_tokenmap(token.clone(), &self.tokenmap_uri).await == false {
+            if Self::check_tokenmap(token.clone(), &self.tokenmap_uri)
+                .await
+                .is_err()
+            {
                 // TODO: add some metrics
                 error!("bad token detected");
                 reply.ok.push(false);
@@ -107,7 +113,10 @@ impl BrioletteValidate {
         clerk_uri: &String,
         epoch_pk: &Vec<u8>,
     ) -> Result<EpochUpdate, BrioletteErrorCode> {
-        if let Ok(mut client) = ClerkClient::connect(clerk_uri.clone()).await {
+        let uri: Uri = clerk_uri
+            .parse()
+            .map_err(|_| BrioletteErrorCode::ClerkFetchFailure)?;
+        if let Ok(mut client) = ClerkClient::multiconnect(&uri).await {
             let epoch_request = tonic::Request::new(EpochRequest::default());
             if let Ok(response) = client.get_epoch(epoch_request).await {
                 let msg = response.into_inner();
@@ -124,9 +133,10 @@ impl BrioletteValidate {
     }
 
     // TODO(redpig) move this onto a Token trait
-    async fn check_tokenmap(token: token::Token, uri: &String) -> bool {
-        if let Ok(mut client) = TokenMapClient::connect(uri.clone()).await {
-            trace!("Connected to tokenmap!");
+    async fn check_tokenmap(token: token::Token, tokenmap_uri: &String) -> Result<(), ()> {
+        let uri: Uri = tokenmap_uri.parse().map_err(|_| ())?;
+        if let Ok(mut client) = TokenMapClient::multiconnect(&uri).await {
+            trace!("connected to tokenmap!");
             let request = UpdateRequest {
                 id: token.clone().base.unwrap().signature,
                 token: Some(token.clone()),
@@ -134,10 +144,13 @@ impl BrioletteValidate {
             if let Ok(response) = client.update(request).await {
                 // This shouldn't happen, but this is a reminder that it could.
                 let msg = response.into_inner();
-                return msg.abuse_detected == false;
+                if msg.abuse_detected {
+                    return Err(());
+                }
+                return Ok(());
             }
         }
         error!("failed to connected to the tokenmap: {}", uri.clone());
-        return false;
+        Err(())
     }
 }

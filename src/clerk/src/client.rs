@@ -19,15 +19,17 @@ use briolette_proto::briolette::clerk::{
 };
 use briolette_proto::briolette::Version;
 use briolette_proto::briolette::{Error as BrioletteError, ErrorCode as BrioletteErrorCode};
+use briolette_proto::BrioletteClientHelper;
 use rand::Rng;
 
 use prost::Message;
 use std::path::Path;
 use tokio;
+use tonic::transport::Uri;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = ClerkClient::connect("http://[::1]:50052").await?;
+    let mut client = ClerkClient::multiconnect(&Uri::try_from("http://[::1]:50052")?).await?;
     let mut rng = rand::thread_rng();
 
     let eu;

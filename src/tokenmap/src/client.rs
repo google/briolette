@@ -16,9 +16,11 @@ use briolette_proto::briolette::tokenmap::token_map_client::TokenMapClient;
 use briolette_proto::briolette::tokenmap::{
     revocation_data_request::Select, RevocationDataRequest, SelectGroup,
 };
+use briolette_proto::BrioletteClientHelper;
 use clap::Parser as ClapParser;
 
 use tokio;
+use tonic::transport::Uri;
 
 #[derive(ClapParser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -37,7 +39,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let mut client = TokenMapClient::connect(args.server_address).await?;
+    let mut client = TokenMapClient::multiconnect(&Uri::try_from(args.server_address)?).await?;
 
     let request = RevocationDataRequest {
         select: Some(Select::Group(SelectGroup::All.into())),

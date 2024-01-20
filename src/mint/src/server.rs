@@ -20,6 +20,7 @@ use briolette_proto::briolette::tokenmap::token_map_client::TokenMapClient;
 use briolette_proto::briolette::tokenmap::UpdateRequest;
 use briolette_proto::briolette::Version;
 use briolette_proto::briolette::{Error as BrioletteError, ErrorCode as BrioletteErrorCode};
+use briolette_proto::BrioletteClientHelper;
 
 use ecdsa::RecoveryId;
 use log::{error, trace, warn};
@@ -28,6 +29,7 @@ use p256::{PublicKey, SecretKey};
 use prost::Message;
 use rand_core::OsRng;
 use sha2::{Digest, Sha256};
+use tonic::transport::Uri;
 
 #[derive(Debug, Clone)]
 pub struct BrioletteMint {
@@ -175,7 +177,10 @@ impl BrioletteMint {
 }
 
 async fn update_tokenmap(token: token::Token, uri: &String) -> bool {
-    if let Ok(mut client) = TokenMapClient::connect(uri.clone()).await {
+    // TODO(redpig) move Uri parsing back up to the arguments.
+    let real_uri: Uri = uri.parse().unwrap();
+
+    if let Ok(mut client) = TokenMapClient::multiconnect(&real_uri).await {
         trace!("Connected to tokenmap!");
         let request = UpdateRequest {
             id: token.clone().base.unwrap().signature,

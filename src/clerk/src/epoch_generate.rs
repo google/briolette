@@ -19,6 +19,7 @@ use briolette_proto::briolette::tokenmap::token_map_client::TokenMapClient;
 use briolette_proto::briolette::tokenmap::{RevocationDataRequest, SelectGroup};
 use briolette_proto::briolette::{Error as BrioletteError, ErrorCode as BrioletteErrorCode};
 use briolette_proto::briolette::{ServiceMapInterface, ServiceName};
+use briolette_proto::BrioletteClientHelper;
 use clap::Parser as ClapParser;
 use log::*;
 use p256::{
@@ -32,6 +33,7 @@ use sha2::{Digest, Sha256};
 use prost::Message;
 use std::path::PathBuf;
 use tokio;
+use tonic::transport::Uri;
 
 async fn get_revoked_groups(
     group_max: u32,
@@ -39,7 +41,7 @@ async fn get_revoked_groups(
     uri: &String,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     // TODO: Parameterize
-    if let Ok(mut client) = TokenMapClient::connect(uri.clone()).await {
+    if let Ok(mut client) = TokenMapClient::multiconnect(&Uri::try_from(uri.clone())?).await {
         trace!("Connected to tokenmap!");
         let request = RevocationDataRequest {
             select: Some(Select::Group(SelectGroup::All.into())),
@@ -116,8 +118,10 @@ async fn make_epoch_update(args: &Args) -> EpochUpdate {
     eed.service_map
         .add(ServiceName::Swap, &"http://[::1]:50057".to_string());
     // TODO(redpig) These should only be added if the tokenmap or mint services are used by client devices.
-    eed.service_map.add(ServiceName::Mint, &"http://[::1]:50053".to_string());
-    eed.service_map.add(ServiceName::Tokenmap, &"http://[::1]:50054".to_string());
+    eed.service_map
+        .add(ServiceName::Mint, &"http://[::1]:50053".to_string());
+    eed.service_map
+        .add(ServiceName::Tokenmap, &"http://[::1]:50054".to_string());
 
     // Compute the ceil of the division.
     let group_bytes: usize = ((args.group_max + u8::BITS - 1) / u8::BITS) as usize;
@@ -233,7 +237,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init()
         .unwrap();
     let args = Args::parse();
-    let mut client = ClerkClient::connect(args.clerk_uri.clone()).await?;
+    let mut client = ClerkClient::multiconnect(&Uri::try_from(args.clerk_uri.clone())?).await?;
 
     // 0. Fetch EpochUpdate
     let mut eu = None;

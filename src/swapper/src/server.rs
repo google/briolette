@@ -36,7 +36,8 @@ impl BrioletteSwapper {
         validate_uri: String,
     ) -> Result<Self, BrioletteErrorCode> {
         trace!("initializing wallet");
-        let mut wd = WalletData::new(registrar_uri, clerk_uri, mint_uri, validate_uri);
+        let mut wd = WalletData::new(registrar_uri, clerk_uri, mint_uri, validate_uri)
+            .map_err(|_| BrioletteErrorCode::InvalidMissingFields)?;
         assert!(wd.initialize_keys(b"swapper-wallet-001"));
         assert!(wd.initialize_credential().await);
         assert!(wd.synchronize().await);

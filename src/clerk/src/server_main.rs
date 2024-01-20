@@ -87,7 +87,12 @@ struct Args {
     epoch_data: PathBuf,
 }
 
-fn read_or_generate_key(secret_key_file: &Path, public_key_file: &Path, pk: &mut Vec<u8>, sk: &mut Vec<u8>) -> bool {
+fn read_or_generate_key(
+    secret_key_file: &Path,
+    public_key_file: &Path,
+    pk: &mut Vec<u8>,
+    sk: &mut Vec<u8>,
+) -> bool {
     let mut generate = true;
     if let Ok(secret_key_in) = std::fs::read(secret_key_file) {
         info!("loaded keys from disk: {}", secret_key_file.display());

@@ -17,14 +17,16 @@ use briolette_proto::briolette::validate::validate_client::ValidateClient;
 use briolette_proto::briolette::token;
 use briolette_proto::briolette::validate::ValidateTokensRequest;
 use briolette_proto::briolette::Version;
+use briolette_proto::BrioletteClientHelper;
 
 use prost::Message;
 use std::path::Path;
 use tokio;
+use tonic::transport::Uri;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = ValidateClient::connect("http://[::1]:50055").await?;
+    let mut client = ValidateClient::multiconnect(&Uri::try_from("http://[::1]:50055")?).await?;
 
     let token_0 = std::fs::read(&Path::new("data/wallet/token.0.pb"))
         .expect("mint client generated token is missing");

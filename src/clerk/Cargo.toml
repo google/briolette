@@ -35,6 +35,7 @@ elliptic-curve = { version = "0.12.3", features = ["serde", "serde_json", "group
 chrono = { version = "0.4.23", features = ["serde"] }
 digest = "0.10.6"
 sha2 = "0.10.6"
+tower = "0.4.13"
 rand = "0.8.5"
 stderrlog = "0.5.4"
 clap = { version = "4.3.2", features = ["derive"] }

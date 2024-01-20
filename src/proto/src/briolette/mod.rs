@@ -56,8 +56,8 @@ impl ServiceMapInterface for Option<ServiceMap> {
     fn add(&mut self, name: ServiceName, uri: &String) {
         match self {
             None => {
-               let sm = self.insert(ServiceMap::default());
-               sm.add(name, uri);
+                let sm = self.insert(ServiceMap::default());
+                sm.add(name, uri);
             }
             Some(x) => x.add(name, uri),
         }
@@ -87,7 +87,11 @@ impl ServiceMapInterface for ServiceMap {
     }
 
     fn get(&self, name: ServiceName) -> Vec<String> {
-        self.services.iter().filter(|entry| entry.name == name as i32).map(|entry| entry.uri.clone()).collect()
+        self.services
+            .iter()
+            .filter(|entry| entry.name == name as i32)
+            .map(|entry| entry.uri.clone())
+            .collect()
     }
 
     fn remove_all(&mut self, name: ServiceName) -> bool {
@@ -96,33 +100,74 @@ impl ServiceMapInterface for ServiceMap {
         // Return true if anything was removed.
         cnt > self.services.len()
     }
-
 }
 
 pub mod token;
 
 pub mod validate {
     tonic::include_proto!("briolette.validate");
+
+    use crate::BrioletteClientHelper;
+    impl BrioletteClientHelper for validate_client::ValidateClient<tonic::transport::Channel> {
+        fn new_wrapper(channel: tonic::transport::Channel) -> Self {
+            Self::new(channel)
+        }
+    }
 }
 
 pub mod tokenmap {
     tonic::include_proto!("briolette.tokenmap");
+
+    use crate::BrioletteClientHelper;
+    impl BrioletteClientHelper for token_map_client::TokenMapClient<tonic::transport::Channel> {
+        fn new_wrapper(channel: tonic::transport::Channel) -> Self {
+            Self::new(channel)
+        }
+    }
 }
 
 pub mod mint {
     tonic::include_proto!("briolette.mint");
+
+    use crate::BrioletteClientHelper;
+    impl BrioletteClientHelper for mint_client::MintClient<tonic::transport::Channel> {
+        fn new_wrapper(channel: tonic::transport::Channel) -> Self {
+            Self::new(channel)
+        }
+    }
 }
 
 pub mod clerk;
 
 pub mod registrar {
     tonic::include_proto!("briolette.registrar");
+
+    use crate::BrioletteClientHelper;
+    impl BrioletteClientHelper for registrar_client::RegistrarClient<tonic::transport::Channel> {
+        fn new_wrapper(channel: tonic::transport::Channel) -> Self {
+            Self::new(channel)
+        }
+    }
 }
 
 pub mod receiver {
     tonic::include_proto!("briolette.receiver");
+
+    use crate::BrioletteClientHelper;
+    impl BrioletteClientHelper for receiver_client::ReceiverClient<tonic::transport::Channel> {
+        fn new_wrapper(channel: tonic::transport::Channel) -> Self {
+            Self::new(channel)
+        }
+    }
 }
 
 pub mod swapper {
     tonic::include_proto!("briolette.swapper");
+
+    use crate::BrioletteClientHelper;
+    impl BrioletteClientHelper for swapper_client::SwapperClient<tonic::transport::Channel> {
+        fn new_wrapper(channel: tonic::transport::Channel) -> Self {
+            Self::new(channel)
+        }
+    }
 }
