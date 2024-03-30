@@ -932,6 +932,7 @@ mod tests {
         let tokenmap_uri = tokenmap_uri_ref.clone();
         tokio::spawn(async move {
             println!("Launching test clerk...");
+            // TODO(redpig) make integration tests hermetic short of replacing with fakes.
             println!("Ensure briolette-clerk-server has generated clerk.state before running.");
             // The briolette-clerk-server must be called with registrar data above.
             let mut clerk =

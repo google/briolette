@@ -72,6 +72,7 @@ async fn get_revoked_groups(
     )));
 }
 
+// TODO(redpig): Move this into a helper to make it easier for testing to use.
 async fn make_epoch_update(args: &Args) -> EpochUpdate {
     let mut epoch_update = EpochUpdate::default();
     let now = chrono::offset::Utc::now().timestamp() as u64;
@@ -105,23 +106,18 @@ async fn make_epoch_update(args: &Args) -> EpochUpdate {
     // let nac_gpk = std::fs::read(&Path::new("../registar/data/wallet.nac.gpk")).unwrap();
 
     // Add the service URIs
-    // TODO(redpig): This should be fed by a config server message which is also consumed
-    //               on service startup
+    // TODO(redpig): Populate via config server message or commandline args
     eed.service_map
-        .add(ServiceName::Registrar, &"http://[::1]:50051".to_string());
+        .add(ServiceName::Registrar, &args.registrar_uri);
+    eed.service_map.add(ServiceName::Ticket, &args.clerk_uri);
+    eed.service_map.add(ServiceName::Epoch, &args.clerk_uri);
     eed.service_map
-        .add(ServiceName::Ticket, &"http://[::1]:50052".to_string());
-    eed.service_map
-        .add(ServiceName::Epoch, &"http://[::1]:50052".to_string());
-    eed.service_map
-        .add(ServiceName::Validate, &"http://[::1]:50055".to_string());
-    eed.service_map
-        .add(ServiceName::Swap, &"http://[::1]:50057".to_string());
+        .add(ServiceName::Validate, &args.validate_uri);
+    eed.service_map.add(ServiceName::Swap, &args.swap_uri);
     // TODO(redpig) These should only be added if the tokenmap or mint services are used by client devices.
+    eed.service_map.add(ServiceName::Mint, &args.mint_uri);
     eed.service_map
-        .add(ServiceName::Mint, &"http://[::1]:50053".to_string());
-    eed.service_map
-        .add(ServiceName::Tokenmap, &"http://[::1]:50054".to_string());
+        .add(ServiceName::Tokenmap, &args.tokenmap_uri);
 
     // Compute the ceil of the division.
     let group_bytes: usize = ((args.group_max + u8::BITS - 1) / u8::BITS) as usize;
@@ -194,7 +190,6 @@ struct Args {
     // Path to public mint key
     // TODO(redpig) add list support
     #[arg(
-        short = 'M',
         long,
         value_name = "FILE",
         default_value = "data/mint/mint.pk"
@@ -212,15 +207,41 @@ struct Args {
     ttc_group_public_key: PathBuf,
     // TokenMap server URI
     #[arg(
-        short = 'm',
         long,
         value_name = "URI",
         default_value = "http://[::1]:50054"
     )]
     tokenmap_uri: String,
+    // Swap server URI
+    #[arg(
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50055"
+    )]
+    validate_uri: String,
+    // Swap server URI
+    #[arg(
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50057"
+    )]
+    swap_uri: String,
+    // Mint server URI
+    #[arg(
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50053"
+    )]
+    mint_uri: String,
+    // Registrar server URI
+    #[arg(
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50051"
+    )]
+    registrar_uri: String,
     // Clerk server URI
     #[arg(
-        short = 'c',
         long,
         value_name = "URI",
         default_value = "http://[::1]:50052"

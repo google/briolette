@@ -17,9 +17,7 @@
 #  source utils.sh
 
 clear_data() {
-for dir in $(ls -F data/ | grep /); do
-    (rm $dir/* || true) &>/dev/null
-done
+  find data/ -type f \! -name .gitkeep -exec rm \{\} \;
 }
 
 run_cmd_at() {

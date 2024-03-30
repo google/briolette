@@ -20,16 +20,40 @@ use briolette_proto::briolette::Version;
 use briolette_proto::BrioletteClientHelper;
 
 use prost::Message;
-use std::path::Path;
+use std::path::PathBuf;
 use tokio;
 use tonic::transport::Uri;
 
+use clap::Parser as ClapParser;
+
+#[derive(ClapParser, Debug)]
+#[command(author, version)]
+#[command(about = "basic integration test client for validate")]
+struct Args {
+    // Path to a token to validate
+    #[arg(
+        short = 't',
+        long,
+        value_name = "FILE",
+        default_value = "data/wallet/token.0.pb"
+    )]
+    token: PathBuf,
+    // Validate server URI
+    #[arg(
+        short = 'c',
+        long,
+        value_name = "URI",
+        default_value = "http://[::1]:50055"
+    )]
+    validate_uri: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = ValidateClient::multiconnect(&Uri::try_from("http://[::1]:50055")?).await?;
+    let args = Args::parse();
+    let mut client = ValidateClient::multiconnect(&Uri::try_from(&args.validate_uri)?).await?;
 
-    let token_0 = std::fs::read(&Path::new("data/wallet/token.0.pb"))
-        .expect("mint client generated token is missing");
+    let token_0 = std::fs::read(&args.token).expect("mint client generated token is missing");
     let token = token::Token::decode(token_0.as_slice()).unwrap();
 
     let request = ValidateTokensRequest {

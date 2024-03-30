@@ -379,6 +379,60 @@ pub fn credential_in_group(credential: &Vec<u8>, group_public_key: &Vec<u8>) -> 
     ret == 0
 }
 
+use thiserror::Error;
+#[derive(Error, Debug)]
+pub enum CryptoError {
+    #[error("Low level {0:?}() failed {1:?})")]
+    LowLevelError(String, u64),
+    #[error("I/O Error: {0}")]
+    IOError(String),
+}
+
+/* TODO(redpig) encapsulate key interactions idiomatically
+pub trait Keypair {
+  fn public_key(&self) -> &Vec<u8>;
+  fn secret_key(&self) -> &Vec<u8>;
+
+  fn generate(&mut self) -> Result<(), CryptoError>;
+  // sign
+  // credentials should be diff than keypairs so we can deal with basename sep.
+  // ...
+
+  fn serialize(&self) -> Result<Vec<u8>, CryptoError>;
+  fn deserialize(&mut self, bytes: Vec<u8>) -> Result<(), CryptoError>;
+
+  fn load(&mut self, sk: &Path, pk: &Path) -> Result<(), CryptoError>;
+  fn store(&self, sk: &Path, pk: &Path) -> Result<(), CryptoError>;
+}
+
+
+#[derive(Debug)]
+pub struct IssuerKeypair {
+  secret: Vec<u8>,
+  group_public: Vec<u8>,
+}
+
+impl Keypair for IssuerKeypair {
+  fn public_key(&self) -> &Vec<u8> {
+    self.group_public
+  }
+
+  fn secret(&self) -> &Vec<u8> {
+    self.secret
+  }
+
+  pub fn generate(&mut self) -> Result<(), CryptoError> {
+    let result = generate_issuer_keypair(self.secret, self.group_public);
+    // TOOD(redpig) pass through Err
+    if result == false {
+      return Err(CryptoError::LowLevelError("generate_issuer_keypair", 1));
+    }
+    Ok(())
+  }
+}
+
+*/
+
 #[cfg(test)]
 mod tests {
     use super::*;
