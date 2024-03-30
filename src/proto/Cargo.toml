@@ -21,6 +21,8 @@ sha2 = "0.10.6"
 rand = "0.8.5"
 # Kept to configure p256 usage.
 elliptic-curve = { version = "0.13.1", features = ["pkcs8", "std", "pem"] }
+tower = "0.4.13"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 
 
 

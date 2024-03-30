@@ -31,6 +31,7 @@ use briolette_proto::briolette::validate::validate_client::ValidateClient;
 use briolette_proto::briolette::validate::ValidateTokensRequest;
 use briolette_proto::briolette::Version;
 use briolette_proto::vec_utils;
+use briolette_proto::BrioletteClientHelper;
 use chrono::Utc;
 
 use log::*;
@@ -43,6 +44,7 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 
 use async_trait::async_trait;
+use http::uri::Uri;
 use prost::Message;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -97,7 +99,8 @@ pub trait Wallet: Clone + Serialize + DeserializeOwned + Send {
 
 #[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
 pub struct Credential {
-    issuer_uri: String,
+    #[serde(with = "http_serde::uri")]
+    issuer_uri: Uri,
     public_key: Vec<u8>,
     secret_key: Vec<u8>,
     group_public_key: Option<Vec<u8>>,
@@ -142,11 +145,14 @@ pub struct WalletData {
     // (e.g., most operators will have at least two issuers active to enable rotations.)
     transfer_credential: Credential,
     // Ticket server URI e.g., "http://[::1]:50052"
-    clerk_uri: String,
+    #[serde(with = "http_serde::uri")]
+    clerk_uri: Uri,
     // Ticket server URI e.g., "http://[::1]:50053"
-    mint_uri: String,
+    #[serde(with = "http_serde::uri")]
+    mint_uri: Uri,
     // Validate server URI e.g., "http://[::1]:50055"
-    validate_uri: String,
+    #[serde(with = "http_serde::uri")]
+    validate_uri: Uri,
     // Epoch data
     pub epoch: Epoch,
     // Tickets
@@ -248,21 +254,39 @@ impl From<TicketEntry> for token::SignedTicket {
 
 impl From<TokenEntry> for token::Token {
     fn from(item: TokenEntry) -> Self {
-      token::Token::decode(item.token.as_slice()).unwrap()
+        token::Token::decode(item.token.as_slice()).unwrap()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WalletDataError<'a>(&'a str);
+impl std::error::Error for WalletDataError<'_> {}
+impl std::fmt::Display for WalletDataError<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WalletDataError {}", self.0)
+    }
+}
 
 impl WalletData {
     pub fn new(
-        issuer_uri: String,
-        clerk_uri: String,
-        mint_uri: String,
-        validate_uri: String,
-    ) -> Self {
-        WalletData {
+        issuer_uri_s: String,
+        clerk_uri_s: String,
+        mint_uri_s: String,
+        validate_uri_s: String,
+    ) -> Result<Self, WalletDataError<'static>> {
+        let issuer_uri: Uri = issuer_uri_s
+            .parse()
+            .map_err(|_| WalletDataError("cannot parse Uri"))?;
+        let clerk_uri: Uri = clerk_uri_s
+            .parse()
+            .map_err(|_| WalletDataError("cannot parse Uri"))?;
+        let mint_uri: Uri = mint_uri_s
+            .parse()
+            .map_err(|_| WalletDataError("cannot parse Uri"))?;
+        let validate_uri: Uri = validate_uri_s
+            .parse()
+            .map_err(|_| WalletDataError("cannot parse Uri"))?;
+        Ok(WalletData {
             clerk_uri,
             mint_uri,
             validate_uri,
@@ -275,7 +299,7 @@ impl WalletData {
                 ..Default::default()
             },
             ..Default::default()
-        }
+        })
     }
 
     pub fn load(wallet_file: &Path) -> Result<Self, WalletDataError> {
@@ -327,12 +351,6 @@ impl Wallet for WalletData {
     }
 
     async fn initialize_credential(&mut self) -> bool {
-        if self.transfer_credential.issuer_uri.len() == 0
-            || self.network_credential.issuer_uri.len() == 0
-        {
-            eprintln!("issuer_uri must be set before calling initialize_credential");
-            return false;
-        }
         if self.transfer_credential.secret_key.len() == 0
             || self.network_credential.secret_key.len() == 0
         {
@@ -360,7 +378,7 @@ impl Wallet for WalletData {
                 public_key: self.transfer_credential.public_key.clone(),
             }),
         });
-        match RegistrarClient::connect(self.network_credential.issuer_uri.clone()).await {
+        match RegistrarClient::multiconnect(&self.network_credential.issuer_uri).await {
             Ok(mut client) => {
                 let response = client.register_call(request).await;
                 //println!("RESPONSE={:?}", response);
@@ -437,7 +455,7 @@ impl Wallet for WalletData {
             requests: Some(requests),
             nac_signature: signature,
         };
-        if let Ok(mut client) = ClerkClient::connect(self.clerk_uri.clone()).await {
+        if let Ok(mut client) = ClerkClient::multiconnect(&self.clerk_uri).await {
             match client.get_tickets(request).await {
                 Ok(response) => {
                     println!("get_tickets response={:?}", response);
@@ -498,7 +516,7 @@ impl Wallet for WalletData {
                     return true;
                 }
                 Err(e) => {
-                    eprintln!("get_tickets() failed: {:?}", e);
+                    eprintln!("RPC[wallet->clerk] get_tickets(): failed: {:?}", e);
                     return false;
                 }
             }
@@ -578,7 +596,7 @@ impl Wallet for WalletData {
             version: Version::Current.into(),
             known_epoch: self.epoch.epoch,
         });
-        match ClerkClient::connect(self.clerk_uri.clone()).await {
+        match ClerkClient::multiconnect(&self.clerk_uri).await {
             Ok(mut client) => {
                 let response = client.get_epoch(request).await;
                 //println!("get_epoch response={:?}", response);
@@ -623,7 +641,7 @@ impl Wallet for WalletData {
             ticket: Some(ticket.clone().into()),
         });
 
-        match MintClient::connect(self.mint_uri.clone()).await {
+        match MintClient::multiconnect(&self.mint_uri).await {
             Ok(mut client) => {
                 let response = client.get_tokens(request).await;
                 //println!("get_epoch response={:?}", response);
@@ -693,7 +711,7 @@ impl Wallet for WalletData {
             tokens: tokens.clone(),
         });
 
-        match ValidateClient::connect(self.validate_uri.clone()).await {
+        match ValidateClient::multiconnect(&self.validate_uri).await {
             Ok(mut client) => {
                 let response = client.validate_tokens(request).await;
                 trace!("validate response = {:?}", response);
@@ -726,7 +744,11 @@ impl Wallet for WalletData {
             error!("No tokens to validate");
             return false;
         }
-        let tokens: Vec<token::Token> = self.tokens.iter().map(|t| token::Token::decode(t.token.as_slice()).unwrap()).collect();
+        let tokens: Vec<token::Token> = self
+            .tokens
+            .iter()
+            .map(|t| token::Token::decode(t.token.as_slice()).unwrap())
+            .collect();
         return self.validate_tokens(&tokens).await;
     }
 }
@@ -734,6 +756,7 @@ impl Wallet for WalletData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use briolette_clerk::server::BrioletteClerk;
     use briolette_mint::server::BrioletteMint;
     use briolette_proto::briolette::clerk::clerk_server::ClerkServer;
     use briolette_proto::briolette::mint::mint_server::MintServer;
@@ -741,22 +764,21 @@ mod tests {
     use briolette_proto::briolette::tokenmap::token_map_server::TokenMapServer;
     use briolette_proto::briolette::validate::validate_server::ValidateServer;
     use briolette_proto::briolette::ErrorCode as BrioletteErrorCode;
+    use briolette_proto::briolette::{ServiceMapInterface, ServiceName};
+    use briolette_registrar::server::BrioletteRegistrar;
     use briolette_tokenmap::server::BrioletteTokenMap;
     use briolette_validate::server::BrioletteValidate;
-    use briolette_clerk::server::BrioletteClerk;
-    use briolette_registrar::server::BrioletteRegistrar;
-    use glob::glob;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use tokio::net::TcpListener;
-    use tokio::sync::oneshot;
+    use tempdir::TempDir;
+    use tokio::net::UnixListener;
+    use tokio_stream::wrappers::UnixListenerStream;
 
-    static TOKENMAP_RUNNING: AtomicUsize = AtomicUsize::new(0);
+    use tokio::sync::oneshot;
 
     #[test]
     pub fn setup_logger() {
         stderrlog::new()
             .quiet(false)
-            .verbosity(1)
+            .verbosity(0)
             .timestamp(stderrlog::Timestamp::Millisecond)
             .init()
             .unwrap();
@@ -796,96 +818,139 @@ mod tests {
     pub fn initialize_keys_basic() {
         let mut wd = WalletData::default();
         assert_eq!(wd.initialize_keys(b"test-id"), true);
-    } //tokio::test(flavor = "multi_thread")]
+    }
 
-    async fn setup_tokenmap() -> String {
-        let db_id = TOKENMAP_RUNNING.fetch_add(1, Ordering::SeqCst);
+    async fn setup_tokenmap(tmp: &TempDir) -> Result<Uri, ()> {
+        let socket = tmp.path().join("tokenmap.socket");
+        let client_path = format!(
+            "socket://localhost{}",
+            socket.clone().into_os_string().into_string().unwrap()
+        )
+        .to_string();
+        tokio::fs::create_dir_all(socket.as_path().parent().unwrap())
+            .await
+            .unwrap();
+
         let (tx, rx) = oneshot::channel::<u16>();
 
         tokio::spawn(async move {
-            println!("Launching test tokenmap...");
-            let listener = TcpListener::bind("[::1]:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            tx.send(addr.port()).unwrap();
+            println!("Launching test tokenmap at {:?}...", socket);
+            let uds = UnixListener::bind(socket).unwrap();
+            let uds_stream = UnixListenerStream::new(uds);
 
-            let dbfile = format!("tokenmap.{}.db", db_id).to_string();
+            tx.send(1).unwrap();
+            let dbfile = format!(":memory:").to_string();
             let tokenmap = BrioletteTokenMap::new(&dbfile).await.unwrap();
 
             match tonic::transport::Server::builder()
                 .add_service(TokenMapServer::new(tokenmap))
-                .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
+                .serve_with_incoming(uds_stream)
                 .await
             {
                 Ok(_) => {
-                    eprintln!("tokenmap server started");
+                    info!("tokenmap server started");
                     // TODO: can we put file clean up here and use Drop to signal shutdown?
                 }
                 Err(x) => {
-                    eprintln!("tokenmap server failed to start: {:?}", x);
+                    error!("tokenmap server failed to start: {:?}", x);
                 }
             }
         });
         match rx.await {
-            Ok(v) => return format!("http://[::1]:{}", v),
-            Err(_) => println!("didn't receive the port"),
+            Ok(_) => {
+                return Ok(Uri::try_from(client_path).unwrap());
+            }
+            Err(e) => {
+                error!("server setup failed: {:?}", e);
+            }
         }
-        assert!(false);
-        return "".to_string();
+        Err(())
     }
 
-    async fn setup_registrar(_tokenmap_uri: String) -> String {
+    async fn setup_registrar(tmp: &TempDir) -> Result<Uri, ()> {
         // Setup a registrar server
+        let socket = tmp.path().join("registrar.socket");
+        let client_path = format!(
+            "socket://localhost{}",
+            socket.clone().into_os_string().into_string().unwrap()
+        )
+        .to_string();
+        tokio::fs::create_dir_all(socket.as_path().parent().unwrap())
+            .await
+            .unwrap();
+
         let (tx, rx) = oneshot::channel::<u16>();
         tokio::spawn(async move {
-            println!("Launching test registrar...");
-            // THese are generated by registrar binaries.
+            trace!("Launching test registrar...");
+            // These are generated by registrar binaries.
             // All paths are relative to the current crate not the workspace.
-            let nsk = Path::new("../../data/registrar/net_issuer.sk");
-            let ngpk = Path::new("../../data/registrar/net_issuer.gpk");
+            let nsk = Path::new("../../data/registrar/nac_issuer.sk");
+            let ngpk = Path::new("../../data/registrar/nac_issuer.gpk");
             let tsk = Path::new("../../data/registrar/ttc_issuer.sk");
             let tgpk = Path::new("../../data/registrar/ttc_issuer.gpk");
-            let registrar = BrioletteRegistrar::new(nsk, ngpk, tsk, tgpk);
-            let listener = TcpListener::bind("[::1]:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            tx.send(addr.port()).unwrap();
+            let registrar = BrioletteRegistrar::new(true, nsk, ngpk, tsk, tgpk);
+
+            println!("Launching test registrar at {:?}...", socket);
+            let uds = UnixListener::bind(socket).unwrap();
+            let uds_stream = UnixListenerStream::new(uds);
+            tx.send(1).unwrap();
 
             match tonic::transport::Server::builder()
                 .add_service(RegistrarServer::new(registrar))
-                .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
+                .serve_with_incoming(uds_stream)
                 .await
             {
                 Ok(_) => {
-                    eprintln!("registrar server started");
+                    info!("registrar server started");
                 }
                 Err(x) => {
-                    eprintln!("registrar server failed to start: {:?}", x);
+                    error!("registrar server failed to start: {:?}", x);
                 }
             }
         });
         match rx.await {
-            Ok(v) => return format!("http://[::1]:{}", v),
-            Err(_) => println!("didn't receive the port"),
+            Ok(_) => return Ok(Uri::try_from(client_path).unwrap()),
+            Err(e) => {
+                error!("server setup failed: {:?}", e);
+            }
         }
-        assert!(false);
-        return "".to_string();
+        Err(())
     }
 
-    async fn setup_clerk(tokenmap_uri: String) -> String {
+    async fn setup_clerk(tmp: &TempDir, tokenmap_uri_ref: &Uri) -> Result<Uri, ()> {
         // Setup a clerk server
+        let socket = tmp.path().join("clerk.socket");
+        let client_path = format!(
+            "socket://localhost{}",
+            socket.clone().into_os_string().into_string().unwrap()
+        )
+        .to_string();
+        tokio::fs::create_dir_all(socket.as_path().parent().unwrap())
+            .await
+            .unwrap();
         let (tx, rx) = oneshot::channel::<u16>();
+        let tokenmap_uri = tokenmap_uri_ref.clone();
         tokio::spawn(async move {
             println!("Launching test clerk...");
+            // TODO(redpig) make integration tests hermetic short of replacing with fakes.
             println!("Ensure briolette-clerk-server has generated clerk.state before running.");
-            // The ette-clerk-server must be called with registrar data above.
-            let mut clerk = BrioletteClerk::load(Path::new("../../data/clerk/clerk.state")).unwrap();
-            clerk.tokenmap_uri = tokenmap_uri;
-            let listener = TcpListener::bind("[::1]:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            tx.send(addr.port()).unwrap();
+            // The briolette-clerk-server must be called with registrar data above.
+            let mut clerk =
+                BrioletteClerk::load(Path::new("../../data/clerk/clerk.state")).unwrap();
+            clerk.tokenmap_uri = tokenmap_uri.clone();
+            info!(
+                "overriding clerk state tokenmap URI with {:?}",
+                clerk.tokenmap_uri
+            );
+            println!("Launching test registrar at {:?}...", socket);
+            let uds = UnixListener::bind(socket).unwrap();
+            let uds_stream = UnixListenerStream::new(uds);
+
+            tx.send(1).unwrap();
 
             match tonic::transport::Server::builder()
                 .add_service(ClerkServer::new(clerk))
-                .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
+                .serve_with_incoming(uds_stream)
                 .await
             {
                 Ok(_) => {
@@ -897,15 +962,23 @@ mod tests {
             }
         });
         match rx.await {
-            Ok(v) => return format!("http://[::1]:{}", v),
+            Ok(_) => return Ok(Uri::try_from(client_path).unwrap()),
             Err(_) => println!("didn't receive the port"),
         }
-        assert!(false);
-        return "".to_string();
+        Err(())
     }
 
-    async fn setup_mint(tokenmap_uri: String) -> String {
+    async fn setup_mint(tmp: &TempDir, tokenmap_uri: Uri) -> Result<Uri, ()> {
         // Setup a registrar server
+        let socket = tmp.path().join("mint.socket");
+        let client_path = format!(
+            "socket://localhost{}",
+            socket.clone().into_os_string().into_string().unwrap()
+        )
+        .to_string();
+        tokio::fs::create_dir_all(socket.as_path().parent().unwrap())
+            .await
+            .unwrap();
         let (tx, rx) = oneshot::channel::<u16>();
         tokio::spawn(async move {
             println!("Launching test registrar...");
@@ -914,81 +987,114 @@ mod tests {
                 .expect("../../data/mint/mint.sk not populated yet");
             let ttc_gpk = std::fs::read("../../data/wallet/ttc.gpk")
                 .expect("../../data/wallet/ttc.gpk not populated yet");
-            let ticket_pk =
-                std::fs::read("../../data/clerk/ticket.pk").expect("../../data/clerk not populated yet");
+            let ticket_pk = std::fs::read("../../data/clerk/ticket.pk")
+                .expect("../../data/clerk not populated yet");
             let mint = BrioletteMint::new(msk, ttc_gpk, vec![ticket_pk], tokenmap_uri.to_string())
                 .unwrap();
-            let listener = TcpListener::bind("[::1]:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            tx.send(addr.port()).unwrap();
+            info!("Launching test mint at {:?}...", socket);
+            let uds = UnixListener::bind(socket).unwrap();
+            let uds_stream = UnixListenerStream::new(uds);
+            tx.send(1).unwrap();
 
             // serve_with_shutdown and a oneshot works in theory, it doesn't
             // release the port in a useful timeframe. Need to move over to
             // serve_with_incoming()
             match tonic::transport::Server::builder()
                 .add_service(MintServer::new(mint))
-                .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
+                .serve_with_incoming(uds_stream)
                 .await
             {
                 Ok(_) => {
-                    eprintln!("registrar server started");
+                    info!("mint server started");
                 }
                 Err(x) => {
-                    eprintln!("registrar server failed to start: {:?}", x);
+                    info!("mint server failed to start: {:?}", x);
                 }
             }
         });
         match rx.await {
-            Ok(v) => return format!("http://[::1]:{}", v),
-            Err(_) => println!("didn't receive the port"),
+            Ok(_) => return Ok(Uri::try_from(client_path).unwrap()),
+            Err(e) => {
+                error!("server setup failed: {:?}", e);
+            }
         }
-        assert!(false);
-        return "".to_string();
+        Err(())
     }
 
-    async fn setup_validate(clerk_uri: String, tokenmap_uri: String) -> String {
+    async fn setup_validate(tmp: &TempDir, clerk_uri: Uri, tokenmap_uri: Uri) -> Result<Uri, ()> {
         // Setup a validate server
+        let socket = tmp.path().join("validate.socket");
+        let client_path = format!(
+            "socket://localhost{}",
+            socket.clone().into_os_string().into_string().unwrap()
+        )
+        .to_string();
+        tokio::fs::create_dir_all(socket.as_path().parent().unwrap())
+            .await
+            .unwrap();
+
         let (tx, rx) = oneshot::channel::<u16>();
         tokio::spawn(async move {
             println!("Launching test validate...");
             // These are generated by validate server binaries.
-            let epoch_pk =
-                std::fs::read("../../data/clerk/epoch.pk").expect("../../data/clerk not populated yet");
-            let validate = BrioletteValidate::new(clerk_uri, tokenmap_uri, epoch_pk)
-                .await
-                .unwrap();
-            let listener = TcpListener::bind("[::1]:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            tx.send(addr.port()).unwrap();
+            let epoch_pk = std::fs::read("../../data/clerk/epoch.pk")
+                .expect("../../data/clerk not populated yet");
+            let mut epoch_update =
+                BrioletteValidate::fetch_epoch_update(&clerk_uri.to_string(), &epoch_pk).await;
+            assert_eq!(epoch_update.is_ok(), true);
+
+            // While the Tokenmap URI resides in here, we just doctor it since the Validator
+            // is not re-checking the EU.
+            let eu = epoch_update.as_mut().unwrap();
+            let eed = eu.extended_data.as_mut().unwrap();
+            eed.service_map.remove_all(ServiceName::Tokenmap);
+            eed.service_map
+                .add(ServiceName::Tokenmap, &tokenmap_uri.to_string());
+            let known_tms = eed.service_map.get(ServiceName::Tokenmap);
+            eu.extended_data = Some(eed.clone());
+
+            println!(
+                "Configuring validation against test tokenmap: {}",
+                tokenmap_uri
+            );
+            println!("Known tokenmaps: {:?}", known_tms);
+
+            let validate = BrioletteValidate::new(&eu).await.unwrap();
+            info!("Launching test mint at {:?}...", socket);
+            let uds = UnixListener::bind(socket).unwrap();
+            let uds_stream = UnixListenerStream::new(uds);
+            tx.send(1).unwrap();
 
             // serve_with_shutdown and a oneshot works in theory, it doesn't
             // release the port in a useful timeframe. Need to move over to
             // serve_with_incoming()
             match tonic::transport::Server::builder()
                 .add_service(ValidateServer::new(validate))
-                .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
+                .serve_with_incoming(uds_stream)
                 .await
             {
                 Ok(_) => {
-                    eprintln!("registrar server started");
+                    info!("registrar server started");
                 }
                 Err(x) => {
-                    eprintln!("registrar server failed to start: {:?}", x);
+                    error!("registrar server failed to start: {:?}", x);
                 }
             }
         });
         match rx.await {
-            Ok(v) => return format!("http://[::1]:{}", v),
-            Err(_) => println!("didn't receive the port"),
+            Ok(_) => return Ok(Uri::try_from(client_path).unwrap()),
+            Err(e) => {
+                error!("server setup failed: {:?}", e);
+            }
         }
-        assert!(false);
-        return "".to_string();
+        Err(())
     }
 
     #[tokio::test]
     async fn initialize_credential_basic() {
-        let tokenmap_uri = setup_tokenmap().await;
-        let registrar_uri = setup_registrar(tokenmap_uri.clone()).await;
+        let tmp = TempDir::new("briolette-svc").expect("create new TempDir");
+        let _tokenmap_uri = setup_tokenmap(&tmp).await.unwrap();
+        let registrar_uri = setup_registrar(&tmp).await.unwrap();
         let mut wd = WalletData::default();
         wd.network_credential.issuer_uri = registrar_uri.clone();
         wd.transfer_credential.issuer_uri = registrar_uri.clone();
@@ -1002,18 +1108,20 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn fetch_epoch_from_clerk() {
         // FIXME: This test depends on clerk having a valid EpochUpdate in ../../data/clerk.state.
-        let tokenmap_uri = setup_tokenmap().await;
+        let tmp = TempDir::new("briolette-svc").expect("create new TempDir");
+        let tokenmap_uri = setup_tokenmap(&tmp).await.unwrap();
         let mut wd = WalletData::default();
-        wd.clerk_uri = setup_clerk(tokenmap_uri.clone()).await;
+        wd.clerk_uri = setup_clerk(&tmp, &tokenmap_uri).await.unwrap();
         assert_eq!(wd.synchronize().await, true);
         teardown();
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn get_tickets_ok() {
-        let tokenmap_uri = setup_tokenmap().await;
-        let registrar_uri = setup_registrar(tokenmap_uri.clone()).await;
-        let clerk_uri = setup_clerk(tokenmap_uri.clone()).await;
+        let tmp = TempDir::new("briolette-svc").expect("create new TempDir");
+        let tokenmap_uri = setup_tokenmap(&tmp).await.unwrap();
+        let registrar_uri = setup_registrar(&tmp).await.unwrap();
+        let clerk_uri = setup_clerk(&tmp, &tokenmap_uri).await.unwrap();
         let mut wd = WalletData::default();
         wd.clerk_uri = clerk_uri.clone();
         wd.network_credential.issuer_uri = registrar_uri.clone();
@@ -1028,10 +1136,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn withdraw_ok() {
-        let tokenmap_uri = setup_tokenmap().await;
-        let registrar_uri = setup_registrar(tokenmap_uri.clone()).await;
-        let clerk_uri = setup_clerk(tokenmap_uri.clone()).await;
-        let mint_uri = setup_mint(tokenmap_uri.clone()).await;
+        let tmp = TempDir::new("briolette-svc").expect("create new TempDir");
+        let tokenmap_uri = setup_tokenmap(&tmp).await.unwrap();
+        let registrar_uri = setup_registrar(&tmp).await.unwrap();
+        let clerk_uri = setup_clerk(&tmp, &tokenmap_uri).await.unwrap();
+        let mint_uri = setup_mint(&tmp, tokenmap_uri.clone()).await.unwrap();
         let mut wd = WalletData::default();
         wd.clerk_uri = clerk_uri.clone();
         wd.network_credential.issuer_uri = registrar_uri.clone();
@@ -1050,10 +1159,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn withdraw_tickets_norecovery() {
-        let tokenmap_uri = setup_tokenmap().await;
-        let registrar_uri = setup_registrar(tokenmap_uri.clone()).await;
-        let clerk_uri = setup_clerk(tokenmap_uri.clone()).await;
-        let mint_uri = setup_mint(tokenmap_uri.clone()).await;
+        let tmp = TempDir::new("briolette-svc").expect("create new TempDir");
+        let tokenmap_uri = setup_tokenmap(&tmp).await.unwrap();
+        let registrar_uri = setup_registrar(&tmp).await.unwrap();
+        let clerk_uri = setup_clerk(&tmp, &tokenmap_uri).await.unwrap();
+        let mint_uri = setup_mint(&tmp, tokenmap_uri.clone()).await.unwrap();
         let mut wd = WalletData::default();
         wd.clerk_uri = clerk_uri.clone();
         wd.network_credential.issuer_uri = registrar_uri.clone();
@@ -1074,10 +1184,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn withdraw_tickets_local_modification() {
-        let tokenmap_uri = setup_tokenmap().await;
-        let registrar_uri = setup_registrar(tokenmap_uri.clone()).await;
-        let clerk_uri = setup_clerk(tokenmap_uri.clone()).await;
-        let mint_uri = setup_mint(tokenmap_uri.clone()).await;
+        let tmp = TempDir::new("briolette-svc").expect("create new TempDir");
+        let tokenmap_uri = setup_tokenmap(&tmp).await.unwrap();
+        let registrar_uri = setup_registrar(&tmp).await.unwrap();
+        let clerk_uri = setup_clerk(&tmp, &tokenmap_uri).await.unwrap();
+        let mint_uri = setup_mint(&tmp, tokenmap_uri.clone()).await.unwrap();
         let mut wd = WalletData::default();
         wd.clerk_uri = clerk_uri.clone();
         wd.network_credential.issuer_uri = registrar_uri.clone();
@@ -1098,10 +1209,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn withdraw_tickets_corrupt_sig() {
-        let tokenmap_uri = setup_tokenmap().await;
-        let registrar_uri = setup_registrar(tokenmap_uri.clone()).await;
-        let clerk_uri = setup_clerk(tokenmap_uri.clone()).await;
-        let mint_uri = setup_mint(tokenmap_uri.clone()).await;
+        let tmp = TempDir::new("briolette-svc").expect("create new TempDir");
+        let tokenmap_uri = setup_tokenmap(&tmp).await.unwrap();
+        let registrar_uri = setup_registrar(&tmp).await.unwrap();
+        let clerk_uri = setup_clerk(&tmp, &tokenmap_uri).await.unwrap();
+        let mint_uri = setup_mint(&tmp, tokenmap_uri.clone()).await.unwrap();
         let mut wd = WalletData::default();
         wd.clerk_uri = clerk_uri.clone();
         wd.network_credential.issuer_uri = registrar_uri.clone();
@@ -1124,10 +1236,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn withdraw_and_transfer() {
-        let tokenmap_uri = setup_tokenmap().await;
-        let registrar_uri = setup_registrar(tokenmap_uri.clone()).await;
-        let clerk_uri = setup_clerk(tokenmap_uri.clone()).await;
-        let mint_uri = setup_mint(tokenmap_uri.clone()).await;
+        let tmp = TempDir::new("briolette-svc").expect("create new TempDir");
+        let tokenmap_uri = setup_tokenmap(&tmp).await.unwrap();
+        let registrar_uri = setup_registrar(&tmp).await.unwrap();
+        let clerk_uri = setup_clerk(&tmp, &tokenmap_uri).await.unwrap();
+        let mint_uri = setup_mint(&tmp, tokenmap_uri.clone()).await.unwrap();
         let mut wd = WalletData::default();
         wd.clerk_uri = clerk_uri.clone();
         wd.network_credential.issuer_uri = registrar_uri.clone();
@@ -1148,6 +1261,7 @@ mod tests {
         assert_eq!(wd.pending_tokens.len(), 2);
         let t = token::Token::decode(wd.pending_tokens[0].as_slice()).unwrap();
         // A token with a token base and transfer is 987-989 bytes.
+        info!("token len: {}", wd.pending_tokens[0].len());
         assert!(wd.pending_tokens[0].len() >= 987);
         assert!(wd.pending_tokens[0].len() <= 990);
         assert_eq!(
@@ -1165,10 +1279,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn withdraw_and_transfer_and_transfer() {
-        let tokenmap_uri = setup_tokenmap().await;
-        let registrar_uri = setup_registrar(tokenmap_uri.clone()).await;
-        let clerk_uri = setup_clerk(tokenmap_uri.clone()).await;
-        let mint_uri = setup_mint(tokenmap_uri.clone()).await;
+        let tmp = TempDir::new("briolette-svc").expect("create new TempDir");
+        let tokenmap_uri = setup_tokenmap(&tmp).await.unwrap();
+        let registrar_uri = setup_registrar(&tmp).await.unwrap();
+        let clerk_uri = setup_clerk(&tmp, &tokenmap_uri).await.unwrap();
+        let mint_uri = setup_mint(&tmp, tokenmap_uri.clone()).await.unwrap();
         let mut wd = WalletData::default();
         wd.clerk_uri = clerk_uri.clone();
         wd.network_credential.issuer_uri = registrar_uri.clone();
@@ -1314,12 +1429,21 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn withdraw_and_transfer_and_validate_and_double_spend() {
-        let tokenmap_uri = setup_tokenmap().await;
-        let registrar_uri = setup_registrar(tokenmap_uri.clone()).await;
-        let clerk_uri = setup_clerk(tokenmap_uri.clone()).await;
-        let mint_uri = setup_mint(tokenmap_uri.clone()).await;
-        let validate_uri = setup_validate(clerk_uri.clone(), tokenmap_uri.clone()).await;
-        let mut wd = WalletData::new(registrar_uri, clerk_uri, mint_uri, validate_uri);
+        let tmp = TempDir::new("briolette-svc").expect("create new TempDir");
+        let tokenmap_uri = setup_tokenmap(&tmp).await.unwrap();
+        let registrar_uri = setup_registrar(&tmp).await.unwrap();
+        let clerk_uri = setup_clerk(&tmp, &tokenmap_uri).await.unwrap();
+        let mint_uri = setup_mint(&tmp, tokenmap_uri.clone()).await.unwrap();
+        let validate_uri = setup_validate(&tmp, clerk_uri.clone(), tokenmap_uri.clone())
+            .await
+            .unwrap();
+        let mut wd = WalletData::new(
+            registrar_uri.to_string(),
+            clerk_uri.to_string(),
+            mint_uri.to_string(),
+            validate_uri.to_string(),
+        )
+        .unwrap();
         assert_eq!(wd.initialize_keys(b"test-id2"), true);
         assert_eq!(wd.initialize_credential().await, true);
         assert_eq!(wd.synchronize().await, true);
@@ -1361,16 +1485,6 @@ mod tests {
     }
 
     pub fn teardown() {
-        let remaining = TOKENMAP_RUNNING.fetch_sub(1, Ordering::SeqCst);
-        if remaining != 0 {
-            return;
-        }
-        // This is best effort hacky. Clean it up later, (TODO)
-        for entry in glob("tokenmap.*.db").expect("Failed to read glob pattern") {
-            match entry {
-                Ok(path) => std::fs::remove_file(path).unwrap(),
-                Err(e) => println!("{:?}", e),
-            }
-        }
+        // Should be handled buy TempDir
     }
 }

@@ -14,7 +14,9 @@
 
 use crate::server::BrioletteSwapper;
 use briolette_proto::briolette::swapper::swapper_server::Swapper;
-use briolette_proto::briolette::swapper::{SwapTokensReply, SwapTokensRequest, GetDestinationRequest, GetDestinationReply};
+use briolette_proto::briolette::swapper::{
+    GetDestinationReply, GetDestinationRequest, SwapTokensReply, SwapTokensRequest,
+};
 use tonic::{Request, Response, Status};
 
 #[tonic::async_trait]

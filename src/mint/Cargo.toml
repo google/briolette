@@ -31,6 +31,7 @@ rand = "0.8.5"
 stderrlog = "0.5.4"
 # Used to ensure p256 dependency features
 elliptic-curve = { version = "0.13.1", features = ["pkcs8", "std", "pem"] }
+clap = { version = "4.3.2", features = ["derive"] }
 
 [build-dependencies]
 tonic-build = "0.8"

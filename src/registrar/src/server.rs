@@ -37,12 +37,13 @@ pub struct BrioletteRegistrar {
 
 impl BrioletteRegistrar {
     fn read_or_generate_key(
+        generate: bool,
         secret_key_file: &Path,
         group_public_key_file: &Path,
         sk: &mut Vec<u8>,
         gpk: &mut Vec<u8>,
     ) -> bool {
-        let mut generate = true;
+        let mut loaded = false;
         if let Ok(mut secret_key_in) = std::fs::read(secret_key_file) {
             if let Ok(mut group_public_key_in) = std::fs::read(group_public_key_file) {
                 info!(
@@ -52,33 +53,45 @@ impl BrioletteRegistrar {
                 );
                 sk.append(&mut secret_key_in);
                 gpk.append(&mut group_public_key_in);
-                generate = false;
+                loaded = true;
             }
         }
-        if generate {
-            // Generate a new secret key public key, and group key.
-            info!(
-                "generating new issuer keypair: {}, {}",
-                secret_key_file.display(),
-                group_public_key_file.display()
-            );
-            let result = v0::generate_issuer_keypair(sk, gpk);
-            if result == false {
-                error!("failed to generate issuer keypair");
-                return false;
-            }
-            // Attempt to update the supplied path with the new keys.
-            if !secret_key_file.as_os_str().is_empty() {
-                std::fs::write(secret_key_file, sk).unwrap_or_else(|_| panic!("could not write secret key to: {:?}/{:?}",  std::env::current_dir().unwrap(), secret_key_file));
-            }
-            if !group_public_key_file.as_os_str().is_empty() {
-                std::fs::write(group_public_key_file, gpk).unwrap();
+        if !loaded {
+            if generate {
+                // Generate a new secret key public key, and group key.
+                info!(
+                    "generating new issuer keypair: {}, {}",
+                    secret_key_file.display(),
+                    group_public_key_file.display()
+                );
+                let result = v0::generate_issuer_keypair(sk, gpk);
+                if result == false {
+                    error!("failed to generate issuer keypair");
+                    return false;
+                }
+                // Attempt to update the supplied path with the new keys.
+                if !secret_key_file.as_os_str().is_empty() {
+                    std::fs::write(secret_key_file, sk).unwrap_or_else(|_| {
+                        panic!(
+                            "could not write secret key to: {:?}/{:?}",
+                            std::env::current_dir().unwrap(),
+                            secret_key_file
+                        )
+                    });
+                }
+                if !group_public_key_file.as_os_str().is_empty() {
+                    std::fs::write(group_public_key_file, gpk).unwrap();
+                }
+                loaded = true;
+            } else {
+                error!("no issuer keypairs found and generation disabled!");
             }
         }
-        return true;
+        return loaded;
     }
 
     pub fn new(
+        generate: bool,
         network_secret_key_file: &Path,
         network_group_public_key_file: &Path,
         transfer_secret_key_file: &Path,
@@ -90,6 +103,7 @@ impl BrioletteRegistrar {
         let mut transfer_group_public_key: Vec<u8> = vec![];
         assert_eq!(
             BrioletteRegistrar::read_or_generate_key(
+                generate,
                 &network_secret_key_file,
                 &network_group_public_key_file,
                 &mut network_secret_key,
@@ -99,6 +113,7 @@ impl BrioletteRegistrar {
         );
         assert_eq!(
             BrioletteRegistrar::read_or_generate_key(
+                generate,
                 &transfer_secret_key_file,
                 &transfer_group_public_key_file,
                 &mut transfer_secret_key,

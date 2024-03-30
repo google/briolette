@@ -22,6 +22,7 @@ log = "0.4.17"
 # client: hwid nonce
 sha256 = "1.1.2"
 bytes = "1.4.0"
+clap = { version = "4.3.2", features = ["derive"] }
 stderrlog = "0.5.4"
 
 [build-dependencies]

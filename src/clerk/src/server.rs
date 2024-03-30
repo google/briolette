@@ -20,15 +20,16 @@ use briolette_proto::briolette::token::{SignedTicket, Ticket, TicketData};
 use briolette_proto::briolette::tokenmap::token_map_client::TokenMapClient;
 use briolette_proto::briolette::tokenmap::{LinkableSignature, StoreTicketsRequest};
 use briolette_proto::briolette::{Error as BrioletteError, ErrorCode as BrioletteErrorCode};
+use briolette_proto::BrioletteClientHelper;
 
 use briolette_proto::briolette::Version;
 
 use bytes::Bytes;
-use p256::pkcs8::{EncodePrivateKey, EncodePublicKey};
+use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey};
 
 use briolette_crypto::v0;
 use ecdsa::RecoveryId;
-use log::trace;
+use log::*;
 use p256::ecdsa::{signature::RandomizedSigner, Signature, SigningKey, VerifyingKey};
 use p256::{PublicKey, SecretKey};
 use prost::Message;
@@ -37,13 +38,14 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
+use tonic::transport::Uri;
 
 #[derive(Debug, Clone)]
 pub struct BrioletteClerk {
     ticket_signing_key: SigningKey,
     epoch_verifying_key: VerifyingKey,
     epoch_update: Arc<RwLock<Option<EpochUpdate>>>, // Interior Mutability
-    pub tokenmap_uri: String,
+    pub tokenmap_uri: Uri,
 }
 // Initially, this will be stored and loaded to persist state.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -83,7 +85,7 @@ impl BrioletteClerk {
                         )?,
                         epoch_verifying_key: vk,
                         epoch_update: Arc::new(RwLock::new(eu)),
-                        tokenmap_uri: x.tokenmap_uri,
+                        tokenmap_uri: Uri::try_from(x.tokenmap_uri)?,
                     })
                 }
                 Err(e) => Err(Box::new(e)),
@@ -118,19 +120,25 @@ impl BrioletteClerk {
                 .ok_or(EpochUpdate::default())
                 .unwrap_or(EpochUpdate::default())
                 .encode_to_vec(),
-            tokenmap_uri: self.tokenmap_uri.clone(),
+            tokenmap_uri: self.tokenmap_uri.to_string(),
         };
         std::fs::write(&data_file, serde_json::to_vec(&es).unwrap())?;
         Ok(true)
     }
 
     // Generates new keys for ticket signing.
-    pub fn new(os_rng: &mut OsRng, epoch_public_key: &VerifyingKey, tokenmap_uri: String) -> Self {
+    pub fn new(
+        ticket_secret_key: &Vec<u8>,
+        epoch_public_key: &VerifyingKey,
+        tokenmap_uri: String,
+    ) -> Self {
         Self {
-            ticket_signing_key: SigningKey::random(os_rng), // TODO(wad) make seed/mock able.
+            ticket_signing_key: SecretKey::from_pkcs8_der(ticket_secret_key.as_slice())
+                .unwrap()
+                .into(),
             epoch_verifying_key: epoch_public_key.clone(),
             epoch_update: Arc::new(RwLock::new(None)),
-            tokenmap_uri,
+            tokenmap_uri: Uri::try_from(tokenmap_uri).unwrap(),
         }
     }
 
@@ -344,19 +352,29 @@ impl BrioletteClerk {
 async fn update_ticket_store(
     signed_tickets: Vec<SignedTicket>,
     nac: LinkableSignature,
-    tokenmap_uri: &String,
+    tokenmap_uri: &Uri,
 ) -> bool {
-    if let Ok(mut client) = TokenMapClient::connect(tokenmap_uri.clone()).await {
-        eprintln!("Connected to tokenmap!");
-        let request = StoreTicketsRequest {
-            tickets: signed_tickets,
-            nac: Some(nac),
-        };
-        if let Ok(_) = client.store_tickets(request).await {
-            eprintln!("Updated ticket store!");
-            return true;
+    match TokenMapClient::multiconnect(tokenmap_uri).await {
+        Ok(mut client) => {
+            trace!("update_ticket_store: Connected to tokenmap!");
+            let request = StoreTicketsRequest {
+                tickets: signed_tickets,
+                nac: Some(nac),
+            };
+            match client.store_tickets(request).await {
+                Ok(_) => {
+                    trace!("Updated ticket store!");
+                    return true;
+                }
+                Err(e) => {
+                    error!("RPC[clerk->tokenmap] store_tickets: failed to connect to tokenmap service [{:?}]", e);
+                }
+            };
         }
-        eprintln!("store_tickets call failed!");
+        Err(e) => {
+            error!("RPC[clerk->tokenmap] update_ticket_store: failed to connect to tokenmap service [{:?}]", e);
+        }
     }
+    error!("update_ticket_store: RPC store_tickets call failed!");
     return false;
 }

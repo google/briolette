@@ -77,7 +77,8 @@ message ExtendedEpochData {
   uint64 epoch_seconds = 5;
   // TODO: Add trust bundle updates so key revocations, etc are not terrible.
   // TODO: Add epoch key distribution to the registrar.
-  // Add service URIs for recovery registration or similar.
+  // Add service URIs for failover, recovery registration, etc.
+  briolette.ServiceMap service_map = 6;
 }
 
 // TODO: figure out delta updates, if needed.

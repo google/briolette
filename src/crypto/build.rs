@@ -20,10 +20,10 @@ use std::process::Command;
 fn main() {
     println!("cargo:rerun-if-changed=src/v0_wrapper.c");
     Command::new("/bin/bash")
-            .arg("-c")
-            .arg("./build-deps.sh")
-            .output()
-            .expect("failed to execute process");
+        .arg("-c")
+        .arg("./build-deps.sh")
+        .output()
+        .expect("failed to execute process");
     let out_dir = env::var("OUT_DIR").unwrap();
     println!(
         "cargo:rustc-link-search={}",

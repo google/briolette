@@ -15,6 +15,7 @@
 tonic::include_proto!("briolette.clerk");
 use crate::briolette::ErrorCode as BrioletteErrorCode;
 use crate::vec_utils;
+use crate::BrioletteClientHelper;
 use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
 use p256::pkcs8::DecodePublicKey;
 use p256::PublicKey;
@@ -53,5 +54,11 @@ impl EpochVerify for EpochUpdate {
             }
         }
         Err(BrioletteErrorCode::InvalidEpochSignature)
+    }
+}
+
+impl BrioletteClientHelper for clerk_client::ClerkClient<tonic::transport::Channel> {
+    fn new_wrapper(channel: tonic::transport::Channel) -> Self {
+        Self::new(channel)
     }
 }

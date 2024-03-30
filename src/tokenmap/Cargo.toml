@@ -28,3 +28,4 @@ hex = "0.4.3"
 log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_info"]}
 rusqlite = { version = "0.28.0", features = ["chrono", "blob", "bundled"] }
 tokio-rusqlite = "0.3.0"
+clap = { version = "4.3.2", features = ["derive"] }

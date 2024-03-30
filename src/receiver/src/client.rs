@@ -15,19 +15,21 @@
 use briolette_proto::briolette::receiver::receiver_client::ReceiverClient;
 use briolette_proto::briolette::receiver::*;
 use briolette_proto::briolette::token;
+use briolette_proto::BrioletteClientHelper;
 
 use briolette_wallet::{Wallet, WalletData};
 use prost::Message;
 use tokio;
+use tonic::transport::Uri;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = ReceiverClient::connect("http://[::1]:50056").await?;
+    let mut client = ReceiverClient::multiconnect(&Uri::try_from("http://[::1]:50056")?).await?;
     let registrar_uri = "http://[::1]:50051".to_string();
     let clerk_uri = "http://[::1]:50052".to_string();
     let mint_uri = "http://[::1]:50053".to_string();
     let validate_uri = "http://[::1]:50054".to_string();
-    let mut wallet = WalletData::new(registrar_uri, clerk_uri, mint_uri, validate_uri);
+    let mut wallet = WalletData::new(registrar_uri, clerk_uri, mint_uri, validate_uri)?;
     assert!(wallet.initialize_keys(b"client-wallet-001"));
     assert!(wallet.initialize_credential().await);
     assert!(wallet.synchronize().await);
