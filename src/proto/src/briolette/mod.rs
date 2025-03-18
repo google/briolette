@@ -24,7 +24,7 @@ impl Into<Status> for Error {
         self.encode(&mut buf).unwrap();
         Status::with_details(
             Code::InvalidArgument,
-            ErrorCode::from_i32(self.code)
+            ErrorCode::try_from(self.code)
                 .unwrap_or(ErrorCode::InvalidMissingFields)
                 .as_str_name(),
             bytes::Bytes::from(buf),

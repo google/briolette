@@ -22,7 +22,6 @@ use briolette_proto::BrioletteClientHelper;
 use prost::Message;
 use std::path::PathBuf;
 use tokio;
-use tonic::transport::Uri;
 
 use clap::Parser as ClapParser;
 
@@ -51,7 +50,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let mut client = ValidateClient::multiconnect(&Uri::try_from(&args.validate_uri)?).await?;
+    let mut client = ValidateClient::multiconnect(&http::uri::Uri::try_from(&args.validate_uri)?).await?;
 
     let token_0 = std::fs::read(&args.token).expect("mint client generated token is missing");
     let token = token::Token::decode(token_0.as_slice()).unwrap();

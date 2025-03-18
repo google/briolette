@@ -16,6 +16,8 @@ pub mod briolette;
 
 // TODO(redpig) Bump these out into a separate helper crate to keep the dependencies
 // lighter.
+use http;
+use hyper_util::rt::TokioIo;
 use log::*;
 use tokio::net::UnixStream;
 use tonic::transport::{Endpoint, Uri};
@@ -34,19 +36,19 @@ pub trait BrioletteClientHelper: Sized {
 
     // Add support for the socket://localhost URI scheme and authority which
     // enables easy switching between UNIX domain sockets and TCP.
-    async fn multiconnect(uri: &Uri) -> Result<Box<Self>, tonic::transport::Error> {
-        let channel = match uri.scheme_str() {
+    async fn multiconnect(uri: &http::Uri) -> Result<Box<Self>, tonic::transport::Error> {
+        let tonic_uri = tonic::transport::Uri::from_parts(uri.clone().into_parts()).unwrap();
+        let channel = match tonic_uri.scheme_str() {
             Some("socket") => {
-                Endpoint::from(uri.clone())
-                    .connect_with_connector(service_fn(|uri: Uri| {
-                        info!("Connecting to socket at {:?}", uri);
+                Endpoint::from(tonic_uri.clone())
+                    .connect_with_connector(service_fn(|luri: Uri| async move {
+                        info!("Connecting to socket at {:?}", luri);
                         // N.b., format!() is used to extract path() without creating a local reference in this
                         //       function, which will then go out of scope.
                         // TODO(redpig) Send pull request updating uds example in tonic.
-                        UnixStream::connect(format!("{}", uri.path()))
+                        Ok::<_, std::io::Error>(TokioIo::new(UnixStream::connect(format!("{}", luri.path())).await?))
                     }))
-                    .await
-            }
+            }.await,
             _ => Endpoint::from(uri.clone()).connect().await,
         };
         if channel.is_ok() {

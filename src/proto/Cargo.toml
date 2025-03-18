@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 tonic = "0.12"
-prost = "0.11"
+prost = "0.13.5"
 rusqlite = { version = "0.28.0", features = ["chrono", "blob", "bundled"] }
 bytes = { version = "1.4.0", features = ["std", "serde"] }
 serde_derive = "1.0.152"
@@ -23,8 +23,8 @@ rand = "0.8.5"
 elliptic-curve = { version = "0.13.1", features = ["pkcs8", "std", "pem"] }
 tower = "0.4.13"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
-
-
+http = "1"  # matches tonic
+hyper-util = { version = "0.1.4" }
 
 
 [build-dependencies]

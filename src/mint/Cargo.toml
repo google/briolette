@@ -14,7 +14,7 @@ path = "src/client.rs"
 
 [dependencies]
 tonic = { version = "0.12" }
-prost = "0.11"
+prost = "0.13.5"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 briolette-crypto = { path = "../crypto", version = "*" }
 briolette-proto = { path = "../proto", version = "*" }
