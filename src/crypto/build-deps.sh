@@ -38,12 +38,14 @@ cd $OUT_DIR/deps
 
 echo "Fetching external dependencies . . ."
 if [ ! -d amcl ]; then
+  echo "Cloning amcl . . ."
   git clone --depth 1 https://github.com/xaptum/amcl.git
 fi
 if [ ! -d ecdaa ]; then
+  echo "Cloning ecdaa . . ."
   git clone --depth 1 https://github.com/xaptum/ecdaa.git
 
-  echo "Applying patches . . ."
+  echo "Applying patches to ecdaa . . ."
   pushd ecdaa
   mkdir -p build/deps
   patch -p1 <$CARGO_MANIFEST_DIR/../../third_party/libecdaa.patch || exit 1
@@ -67,14 +69,14 @@ echo "Building AMCL . . ."
 unset  C_INCLUDE_PATH
 export ECDAA_CURVES=FP256BN
 pushd amcl
-cmake . -DCMAKE_INSTALL_PREFIX=../ecdaa/build/deps -DAMCL_CURVE=${ECDAA_CURVES} -DAMCL_RSA="" -DAMCL_INCLUDE_SUBDIR=amcl -DBUILD_PYTHON=Off -DBUILD_MPIN=Off -DBUILD_WCC=Off -DBUILD_DOCS=Off  -DBUILD_SHARED_LIBS=Off -DECDAA_TPM_SUPPORT=OFF
+cmake . -DCMAKE_INSTALL_PREFIX=../ecdaa/build/deps -DAMCL_CURVE=${ECDAA_CURVES} -DAMCL_RSA="" -DAMCL_INCLUDE_SUBDIR=amcl -DBUILD_PYTHON=Off -DBUILD_MPIN=Off -DBUILD_WCC=Off -DBUILD_DOCS=Off  -DBUILD_SHARED_LIBS=Off -DECDAA_TPM_SUPPORT=OFF -DAMCL_CHUNK=64 -DWORD_SIZE=64
 cmake --build .
 cmake --build . --target install
 popd
 
 echo "Building ECDAA . . ."
 pushd ecdaa/build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DECDAA_CURVES=${ECDAA_CURVES} -DTEST_USE_TCP_TPM=OFF -DBUILD_EXAMPLES=OFF -DBUILD_SHARED_LIBS=OFF -DAMCL_DIR=$(realpath $PWD/deps/lib/cmake/amcl/) -DECDAA_TPM_SUPPORT=OFF
+cmake .. -DCMAKE_BUILD_TYPE=Release -DECDAA_CURVES=${ECDAA_CURVES} -DTEST_USE_TCP_TPM=OFF -DBUILD_EXAMPLES=OFF -DBUILD_SHARED_LIBS=OFF -DAMCL_DIR=$(realpath $PWD/deps/lib/cmake/amcl/) -DECDAA_TPM_SUPPORT=OFF -DWORD_SIZE=64 -DAMCL_CHUNK=64
 cmake --build .
 popd
 

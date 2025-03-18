@@ -16,14 +16,19 @@ extern crate cc;
 use std::env;
 use std::path::Path;
 use std::process::Command;
+use std::io::{self, Write};
 
 fn main() {
     println!("cargo:rerun-if-changed=src/v0_wrapper.c");
-    Command::new("/bin/bash")
+    let output = Command::new("/bin/bash")
         .arg("-c")
         .arg("./build-deps.sh")
         .output()
         .expect("failed to execute process");
+    // Log to stderr to make future maintenance easier.
+    io::stderr().write_all(&output.stdout).unwrap();
+    io::stderr().write_all(&output.stderr).unwrap();
+
     let out_dir = env::var("OUT_DIR").unwrap();
     println!(
         "cargo:rustc-link-search={}",
