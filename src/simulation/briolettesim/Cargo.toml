@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rand = "0.8.5"
+rand = "0.9.3"
 rand_distr = "0.4.3"
 absim = { path = "../absim", version = "0.1.0" }
 levy_distr = { path = "../levy_distr", version = "0.1.0" }
